@@ -25,10 +25,11 @@ public class ActionMapItem
 
 public class ProtocolAction
 {
+    public Log log;
     public ProtocolActionMap map;
     public ProtocolAction()
     {
-
+        this.log = new Log(1, "ProtocolAction  ");
     }
 
     public void SetMap(ProtocolActionMap protocolActionMap)
@@ -45,7 +46,7 @@ public class ProtocolAction
                 return value;
             }
         }
-        Debug.Log("GetClientGetOneById empty id:" + serviceId + funcId);
+        this.log.Err("GetClientGetOneById empty id:" + serviceId + funcId);
         return null;
     }
 
@@ -58,7 +59,7 @@ public class ProtocolAction
                 return value;
             }
         }
-        Debug.Log("GetClientOneByName empty id:" + serviceName + funcName);
+        this.log.Err("GetClientOneByName empty id:" + serviceName + funcName);
         return null;
     }
 
@@ -71,7 +72,7 @@ public class ProtocolAction
                 return value;
             }
         }
-        Debug.Log("GetClientGetOneById empty id:" + serviceId + funcId);
+        this.log.Err("GetClientGetOneById empty id:" + serviceId + funcId);
         return null;
     }
 }

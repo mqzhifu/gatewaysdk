@@ -12,16 +12,17 @@ public delegate string Callback(long responseCode, JsonData jsonData);
 
 public class HttpUtil
 {
-    public string   serverHttpDns;//后端服务器的 HTTP 地址+端口
-    public string   userToken;    //登陆成功后，获取到的用户 TOKEN
-    public string   sourceType;   //来源，即当前设备
-    public string   projectId;    //项目ID
-    public string   access;       //项目的请求密钥
-    public Log      log;          //日志输出 
+    public string serverHttpDns;//后端服务器的 HTTP 地址+端口
+    public string userToken;    //登陆成功后，获取到的用户 TOKEN
+    public string sourceType;   //来源，即当前设备
+    public string projectId;    //项目ID
+    public string access;       //项目的请求密钥
+    public Log log;             //日志输出
 
-    public HttpUtil(string dns, string sourceType,string projectId,string access)
+    public HttpUtil(string dns, string sourceType, string projectId, string access)
     {
         this.log = new Log(1, "HttpUtil  ");
+
         this.serverHttpDns = dns;
         this.userToken = "";
         this.access = access;
@@ -36,10 +37,17 @@ public class HttpUtil
         this.projectId = "6";
         this.sourceType = "11";
     }
+    public void Check()
+    {
+        if (this.serverHttpDns == "" || this.sourceType == "" || this.projectId == "" || this.access == "")
+        {
+            this.throwExpception("serverHttpDns || sourceType || projectId || access is empty!");
+        }
+    }
     //发送请求，阻塞模式
     public JsonData RequestBlock(string HttpMethod, string uri, string jsonStr)
     {
-        UnityWebRequest req = this.GetUnityWebRequest(uri, HttpMethod, jsonStr);
+        UnityWebRequest req = this.GetUnityWebRequest(uri, HttpMethod, jsonStr,"block");
         var  sendWebRequestContext = req.SendWebRequest();
         while (!sendWebRequestContext.isDone)
         {
@@ -50,30 +58,32 @@ public class HttpUtil
         return jd;
     }
     //发送请求，async await 模式
-    async public void RequestAsync(string HttpMethod, string uri, string jsonStr )
+    async public void RequestAsync(string HttpMethod, string uri, string jsonStr, Callback callback)
     {
-        UnityWebRequest req = this.GetUnityWebRequest(uri, HttpMethod, jsonStr);
+        UnityWebRequest req = this.GetUnityWebRequest(uri, HttpMethod, jsonStr,"async");
         UnityWebRequestAsyncOperation SendWebRequestContext =  req.SendWebRequest();
-        while (!SendWebRequestContext.isDone)
-        {
-            await Task.Delay(100);
-        }
 
+        await Task.Delay(100);        
         JsonData jd = this.ProcessHttpBack(req);
+        callback(req.responseCode, jd);
     }
     //发送请求，协程 模式
-    public IEnumerator Request(string HttpMethod, string uri, string jsonStr, Callback callback)
+    public IEnumerator RequestCoroutine(string HttpMethod, string uri, string jsonStr, Callback callback)
     {
-        UnityWebRequest req = this.GetUnityWebRequest(uri, HttpMethod, jsonStr);
+        UnityWebRequest req = this.GetUnityWebRequest(uri, HttpMethod, jsonStr, "coroutine");
         yield return req.SendWebRequest();
         JsonData jd = this.ProcessHttpBack(req);
         callback(req.responseCode,jd);
     }
     //获取一个 WebRequest  实例
-    public UnityWebRequest GetUnityWebRequest(string uri,string HttpMethod, string jsonStr)
+    public UnityWebRequest GetUnityWebRequest(string uri,string HttpMethod, string jsonStr,string source)
     {
+        this.Check();
+        if (uri == "" || HttpMethod == "") {
+            this.throwExpception(" uri | HttpMethod is empty ");
+        }
         string url = this.GetUrl(uri);
-        this.log.Info("HttpRequest url:" + url + " ,post data:" + jsonStr + " HttpMethod:"+ HttpMethod);
+        this.log.Info("HttpRequest url:" + url + " ,post data:" + jsonStr + " HttpMethod:"+ HttpMethod + " , source:"+source);
         UnityWebRequest req = new UnityWebRequest(url);
         req.downloadHandler = new DownloadHandlerBuffer();
         if (HttpMethod == "POST")
@@ -91,7 +101,7 @@ public class HttpUtil
         }
         else
         {
-            this.log.Info("err:HttpMethod wrong," + HttpMethod);
+            this.throwExpception("HttpMethod wrong "+HttpMethod);
         }
 
         this.setCommonHeader(req);
@@ -108,7 +118,8 @@ public class HttpUtil
             if ((int)(jd["code"]) != 200)
             {
                 string errInfo = "commonResponse has err . code:" + jd["code"] + " , msg:" + jd["msg"];
-                this.log.Info(errInfo);
+                //this.log.Info(errInfo);
+                this.throwExpception(errInfo);
                 throw new Exception(errInfo);
             }
             else
@@ -120,9 +131,11 @@ public class HttpUtil
         else
         {
             string errInfo = "request failed ，error: " + req.error + " , result: " + req.result + "  , responseCode: " + req.responseCode;
-            this.log.Info(errInfo);
-            throw new Exception(errInfo);           
+            //this.log.Info(errInfo);
+            this.throwExpception(errInfo);
+            //throw new Exception(errInfo);           
         }
+        return jd;
     }
     //登陆成功后，要设置一下 userToken 下次请求追回到 header中
     public void SetUserToken(string token)
@@ -141,6 +154,12 @@ public class HttpUtil
     public string GetUrl(string uri)
     {
         return this.serverHttpDns + uri;
+    }
+
+    public void throwExpception(string errInfo)
+    {
+        this.log.Err(errInfo);
+        throw new Exception(errInfo);
     }
 
 }

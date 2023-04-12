@@ -17,23 +17,15 @@ using static UnityEditor.MaterialProperty;
 using static UnityEditor.Progress;
 using static UnityEditor.VersionControl.Asset;
 
-
+//长连接收到消息后，回调
 public delegate void GatewayReceiveMsg(byte[] readBuff);
+//长连接建立连接成功后，回调
 public delegate void ConnSuccess();
+//把从服务端接收到的消息，回调给：调用者
+public delegate void BackMsg(GatewayMsg msg);
 
 public class Gateway
 {
-    //public const int CONTENT_TYPE_JSON = 1;
-    //public const int CONTENT_TYPE_PROTOBUF = 2;
-
-    //public const int LOGIN_STATUS_INIT = 1;
-    //public const int LOGIN_STATUS_ING = 2;
-    //public const int LOGIN_STATUS_FAILED = 3;
-    //public const int LOGIN_STATUS_OK = 4;
-
-    //public const int PROTOCOL_TYPE_WS = 2;
-    //public const int PROTOCOL_TYPE_TCP = 1;
-
 
     public GatewayConfig gatewayConfig;
     public ProtocolAction protocolAction;//协议函数定义 - 控制类
@@ -41,26 +33,28 @@ public class Gateway
     public int protocolType;//传输协议类型
     public string userToken;//用户登陆成功后的 token
 
-    private GatewayUtil gatewayUtil;//
+    public Log log;
+    private GatewayUtil gatewayUtil;//工具类，拆包/解包
 
     public Websocket websocket;
-    public CancellationToken ct;
-    public Log log;
+    
     public GatewayHook gatewayHook;
-    public int loginStatus;//登陆状态。长连接建立成功后，需要登陆验证成功后，才可以有后续操作
+    public int loginStatus;//登陆状态：长连接建立成功后，需要登陆验证成功后，才可以有后续操作
+    public BackMsg backMsg;
 
+    //传输内容的格式体
     public enum CONTENT_TYPE
     {
         JSON = 1,
         PROTOBUF = 2,
     }
-
+    //使用的网络协议
     public enum PROTOCOL_TYPE
     {
         TCP = 1,
         WS = 2,
     }
-
+    //登陆状态
     public enum LOGIN_STATUS
     {
         INIT = 1,
@@ -69,43 +63,42 @@ public class Gateway
         SUCCESS = 4,
 
     }
-
-    public Gateway(int contentType, int protocolType, GatewayConfig gatewayConfig, ProtocolAction protocolAction, string userToken)
+    //构造函数
+    public Gateway()
     {
         this.log = new Log(1, "Gateway ");
-        this.CheckConstructor(contentType, protocolType, gatewayConfig, protocolAction, userToken);
+        this.backMsg = null;
         this.gatewayUtil = new GatewayUtil();
-
         this.gatewayHook = new GatewayHook();
         this.loginStatus = (int)Gateway.LOGIN_STATUS.INIT;
 
-        this.contentType = contentType;
-        this.protocolType = protocolType;
 
-        this.gatewayConfig = gatewayConfig;
-        this.protocolAction = protocolAction;
-
-        this.userToken = userToken;
     }
     //初始化，连接后端服务器
-    public void Init()
+    public void Init(int contentType, int protocolType, GatewayConfig gatewayConfig, ProtocolAction protocolAction, string userToken, BackMsg backMsg)
     {
+        this.CheckConstructor(contentType, protocolType, gatewayConfig, protocolAction, userToken);
+
+        this.contentType = contentType;
+        this.protocolType = protocolType;
+        this.gatewayConfig = gatewayConfig;
+        this.protocolAction = protocolAction;
+        this.backMsg = backMsg;
+        this.userToken = userToken;
 
         if (this.protocolType == (int)Gateway.PROTOCOL_TYPE.WS)
         {
             this.log.Info(" init ws connet...");
+            //建立长连接
             this.websocket = new Websocket(this.gatewayConfig , this.ReceiveMsg,this.ConnSuccessBack);
             this.websocket.Init();
         }
         else
         {
 
-        }
-
-        
-        //this.ReceiveMsg();
-
+        }     
     }
+    //长连接建立成功后，回调此函数
     public void ConnSuccessBack()
     {
         this.CS_Login();
@@ -115,13 +108,9 @@ public class Gateway
     {
         var msg = this.gatewayUtil.UnpackMsg(readBuff);
         this.ProcessContent(msg);
-
-
     }
-
     //处理消息(拆包后，具体的消息内容)
-    //public void ProcessContent(int contentType, byte[] content, int serviceId, int funcId)
-    public void ProcessContent(Pb.Msg msg)
+    public void ProcessContent(GatewayMsg msg)
     {
         string serviceIdFuncId = Convert.ToString(msg.ServiceId) + Convert.ToString(msg.FuncId);
         var item = this.protocolAction.GetServerOneById(msg.ServiceId, msg.FuncId);
@@ -129,15 +118,11 @@ public class Gateway
         {
 
         }
-        var content = System.Text.Encoding.Default.GetBytes(msg.Content);
-        //var content = msg.Content.ToCharArray();
-        //msg.Content
-        //var content = Encoding.UTF8.GetBytes(msg.Content);
-        //Google.Protobuf.ByteString.
+
         switch (serviceIdFuncId)
         {
             case "90112":
-                var loginRes = this.gatewayHook.ParserSC_Login(contentType, content);
+                var loginRes = this.gatewayHook.ParserSC_Login(contentType, msg.Content);
                 if (loginRes.Code != 200)
                 {
                     this.log.Err("code: " + loginRes.Code + " , ErrMsg: " + loginRes.ErrMsg);
@@ -150,7 +135,7 @@ public class Gateway
                 }
                 break;
             case "90114"://SC_Ping
-                var pingReq = this.gatewayHook.ParserSC_Ping(contentType, content);
+                var pingReq = this.gatewayHook.ParserSC_Ping(contentType, msg.Content);
                 var pongRes = new Pb.PongRes();
                 pongRes.ClientReqTime = pingReq.ClientReqTime;
                 pongRes.ClientReqTime = pingReq.ClientReceiveTime;
@@ -162,17 +147,21 @@ public class Gateway
 
                 break;
             case "90116"://SC_Pong
-                var contentObj = this.gatewayHook.ParserSC_Pong(contentType, content);
+                var contentObj = this.gatewayHook.ParserSC_Pong(contentType, msg.Content);
                 break;
             case "90120"://SC_KickOff
-                var kickOff = this.gatewayHook.ParserSC_KickOff(contentType, content);
+                var kickOff = this.gatewayHook.ParserSC_KickOff(contentType, msg.Content);
                 this.log.Info("ws conn has kickOff");
                 break;
             case "90122"://SC_ProjectPushMsg
-                var projectPushMsg = this.gatewayHook.ParserSC_ProjectPushMsg(contentType, content);
+                var projectPushMsg = this.gatewayHook.ParserSC_ProjectPushMsg(contentType, msg.Content);
+                if (this.backMsg != null)
+                {
+                    this.backMsg(msg);
+                }
                 break;
             case "90124"://SC_SendMsg
-                var pb_msg = this.gatewayHook.ParserSC_SendMsg(contentType, content);
+                var pb_msg = this.gatewayHook.ParserSC_SendMsg(contentType, msg.Content);
                 break;
             default:
                 Debug.Log("no hit.");
@@ -203,15 +192,20 @@ public class Gateway
     }
     public void SendMsg(ActionMapItem item, byte[] content)
     {
-        var msg = new Pb.Msg();
-        msg.Content = System.Text.Encoding.Default.GetString(content);
-        //msg.Content = System.Text.Encoding.ASCII.GetString(content);
-        msg.ServiceId = item.service_id;
-        msg.FuncId = item.func_id;
-        msg.ContentType = this.contentType;
-        msg.ProtocolType = this.protocolType;
+        if (content.Length <= 0 )
+        {
+            this.log.Err(" SendMsg content.Length <=0");
+            return;
+        }
 
-        var packContent = this.gatewayUtil.PackMsg(msg,content);
+        var msg             = new GatewayMsg();
+        msg.ServiceId       = item.service_id;
+        msg.FuncId          = item.func_id;
+        msg.ContentType     = this.contentType;
+        msg.ProtocolType    = this.protocolType;
+        msg.Content         = content;
+
+        var packContent = this.gatewayUtil.PackMsg(msg);
         //return;
         if (this.protocolType == (int)Gateway.PROTOCOL_TYPE.WS)
         {
@@ -223,38 +217,7 @@ public class Gateway
         }
 
     }
-    //public async void SendMsg(ActionMapItem item, byte[] content)
-    //{
-
-    //var session = "1234567890";
-
-    //Debug.Log("sendMsg len: " + content.Length + ",contentType:" + this.contentType + ",protocolType:" + this.protocolType + " ,  serviceId:" + item.service_id + " , funcId:" + item.func_id + ",content:" + content);
-
-
-    //var contentLenByte = Util.IntToBytes(content.Length);
-    //var contentTypeByte = Util.Byte4Tobyte1(Util.IntToBytes(this.contentType));
-    //var protocolTypeByte = Util.Byte4Tobyte1(Util.IntToBytes(this.protocolType));
-    //var serviceIdByte = Util.Byte4Tobyte1(Util.IntToBytes(item.service_id));
-    //var funcIdByte = Util.Byte4Tobyte2(Util.IntToBytes(item.func_id));
-
-    //var endChat = System.Text.Encoding.Default.GetBytes("\f");
-    //byte[] sessionByteArray = System.Text.Encoding.Default.GetBytes(session);
-
-    //var byteArr = Util.Copybyte(contentLenByte, contentTypeByte);
-    //byteArr = Util.Copybyte(byteArr, protocolTypeByte);
-    //byteArr = Util.Copybyte(byteArr, serviceIdByte);
-    //byteArr = Util.Copybyte(byteArr, funcIdByte);
-    //byteArr = Util.Copybyte(byteArr, sessionByteArray);
-    ////byteArr = this.copybyte(byteArr, contentByteArray);
-    //byteArr = Util.Copybyte(byteArr, content);
-    //byteArr = Util.Copybyte(byteArr, endChat);
-
-
-
-    //await clientWebSocket.SendAsync(byteArr, WebSocketMessageType.Binary, true, this.ct); //发送数据
-
-    //}
-
+    //发送登陆消息
     public void CS_Login()
     {
         this.loginStatus = (int)Gateway.LOGIN_STATUS.ING;
@@ -264,7 +227,7 @@ public class Gateway
         var compressionContent = this.CompressionContent(this.contentType, pbLogin);
         this.SendMsgById(90, 104, compressionContent);
     }
-
+    //发送ping消息
     public void CS_Ping()
     {
         var pingReq = new Pb.PingReq();
@@ -319,48 +282,55 @@ public class Gateway
         return false;
     }
 
-    private bool CheckConstructor(int contentType, int protocolType, GatewayConfig gatewayConfig, ProtocolAction protocolAction, string userToken)
+    private void CheckConstructor(int contentType, int protocolType, GatewayConfig gatewayConfig, ProtocolAction protocolAction, string userToken)
     {
         this.log.Info("construction , contentType:" + contentType + " , protocolType:" + protocolType + " , userToken:" + userToken);
         if (!this.CheckProtoclType(protocolType))
         {
-            this.log.Err("contentType value err . ");
+            this.throwExpception("protocolType value err . ");
         }
 
-        if (!this.CheckProtoclType(contentType))
+        if (!this.CheckContentType(contentType))
         {
-            this.log.Err("contentType value err . ");
+            this.throwExpception("contentType value err . ");
         }
 
         if (userToken == "")
         {
-            this.log.Err("userToken empty . ");
+            this.throwExpception("userToken empty . ");
         }
 
         if (protocolAction == null || protocolAction.map.client == null || protocolAction.map.server == null)
         {
-            this.log.Err("actionMap null . ");
+            this.throwExpception("actionMap null . ");
         }
 
         if (protocolAction.map.client.Count == 0 || protocolAction.map.server.Count == 0)
         {
-            this.log.Err("actionMap count == 0 ");
+            this.throwExpception("actionMap count == 0");
         }
 
         if (gatewayConfig.outIp == "" || gatewayConfig.wsPort == "" || gatewayConfig.wsUri == "")
         {
-            this.log.Err("check gatewayConfig , outIp || wsPort || wsUri is empty~ ");
+            this.throwExpception("check gatewayConfig , outIp || wsPort || wsUri is empty~");
         }
+    }
 
-        return true;
+    public void throwExpception(string errInfo)
+    {
+        this.log.Err(errInfo);
+        throw new Exception(errInfo);
     }
 }
 
 
+
+
+//工具类，拆包/解包
 class GatewayUtil
 {
     public Log log;
-    //解析C端发送的数据，这一层，对于用户层的content数据不做处理
+    //解析C端发送的数据，这一层，对于用户层的 content 数据不做处理
     //1-4字节：当前包数据总长度，~可用于：TCP粘包的情况
     //5字节：content type
     //6字节：protocol type
@@ -373,30 +343,42 @@ class GatewayUtil
     {
         this.log = new Log(1, "GatewayUtil ");
     }
-    //拆包(后端发送的消息)
-    public Pb.Msg UnpackMsg(byte[] readBuff)
+    //一个包，最小的长度
+    public int MsgMinLength()
     {
-        //Debug.Log("ParserOneMsg");
-        //byte[] strByte = System.Text.Encoding.Default.GetBytes(str);
-        var strByte = readBuff;
+        return 4 + 1 + 1 + 1 + 2 + 10 + 1;
+    }
 
+    //拆包(后端发送的消息)
+    public GatewayMsg UnpackMsg(byte[] readBuff)
+    {
+        if (readBuff.Length < this.MsgMinLength())
+        {
+            this.throwExpception("msg length  < "+ this.MsgMinLength());
+        }
 
+        //var strByte = readBuff;
         var contentLengthByte = Util.ByteSubstr(readBuff, 0, 4);
-        //this.PrintBytesArray(contentLengthByte);
+        
         int contentLen = BitConverter.ToInt32(Util.IntByteReversal(contentLengthByte));
-        //Debug.Log("contentLen:"+ contentLen);
-        int contentType = strByte[4];
-        int protocolType = strByte[5];
-        int serviceId = strByte[6];
+        int contentType = readBuff[4];
+        int protocolType = readBuff[5];
+        int serviceId = readBuff[6];
         var funcIdByte = Util.ByteSubstr(readBuff, 7, 2);
         int funcId = BitConverter.ToInt16(Util.Int16ByteReversal(funcIdByte));
-        byte[] sessionBytes = Util.ByteSubstr(strByte, 9, 10);
+        byte[] sessionBytes = Util.ByteSubstr(readBuff, 9, 10);
         string session = System.Text.Encoding.Default.GetString(sessionBytes);
-        byte[] contentByte = Util.ByteSubstr(strByte, 19, contentLen);
+        byte[] contentByte = Util.ByteSubstr(readBuff, 19, contentLen);
         //string content = System.Text.Encoding.Default.GetString(contentByte);
+        //this.PrintBytesArray(contentLengthByte);
 
-        var oneMsg = new Msg();
-        oneMsg.Content = System.Text.Encoding.Default.GetString(contentByte);
+        if (contentLen != contentByte.Length)
+        {
+            this.throwExpception("contentLen != contentByte.Length:"+ contentLen +" != "+ contentByte.Length);
+        }
+
+        var oneMsg = new GatewayMsg();
+        oneMsg.Content = contentByte;
         oneMsg.ServiceId = serviceId;
         oneMsg.FuncId = funcId;
         oneMsg.ContentType = contentType;
@@ -407,7 +389,8 @@ class GatewayUtil
         //this.ProcessContent(contentType, contentByte, serviceId, funcId);
         return oneMsg;
     }
-    public byte[] PackMsg(Pb.Msg msg, byte[] content)
+    //封闭包
+    public byte[] PackMsg(GatewayMsg msg)
     {
         var session = "1234567890";
         this.log.Info("sendMsg len: " + msg.Content.Length + ",contentType:" + msg.ContentType + ",protocolType:" + msg.ProtocolType + " ,  serviceId:" + msg.ServiceId + " , funcId:" + msg.FuncId + ",content:" + msg.Content);
@@ -419,26 +402,25 @@ class GatewayUtil
         var serviceIdByte = Util.Byte4Tobyte1(Util.IntToBytes(msg.ServiceId));
         var funcIdByte = Util.Byte4Tobyte2(Util.IntToBytes(msg.FuncId));
 
-
         //this.PrintBytesArray(contentLenByte);
 
         var endChat = System.Text.Encoding.Default.GetBytes("\f");
         byte[] sessionByteArray = System.Text.Encoding.Default.GetBytes(session);
-        //byte[] contentByteArray = System.Text.Encoding.Default.GetBytes(content);
 
-        //var byteArrLength = 4 + 1 + 1 + 1 + 2 + 10 + content.Length + 1;
-        //var byteArr = new byte[byteArrLength];
         var byteArr = Util.Copybyte(contentLenByte, contentTypeByte);
         byteArr = Util.Copybyte(byteArr, protocolTypeByte);
         byteArr = Util.Copybyte(byteArr, serviceIdByte);
         byteArr = Util.Copybyte(byteArr, funcIdByte);
         byteArr = Util.Copybyte(byteArr, sessionByteArray);
-        //byteArr = this.copybyte(byteArr, contentByteArray);
-        //byteArr = Util.Copybyte(byteArr, System.Text.Encoding.Default.GetBytes(msg.Content));
-        //byteArr = Util.Copybyte(byteArr, System.Text.Encoding.ASCII.GetBytes(msg.Content));
-        byteArr = Util.Copybyte(byteArr,content);
+        byteArr = Util.Copybyte(byteArr, msg.Content);
         byteArr = Util.Copybyte(byteArr, endChat);
 
         return byteArr;
+    }
+
+    public void throwExpception(string errInfo)
+    {
+        this.log.Err(errInfo);
+        throw new Exception(errInfo);
     }
 }

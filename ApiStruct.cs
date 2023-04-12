@@ -50,3 +50,12 @@ public class GatewayConfig
     public int client_heartbeat_time;
     public int server_heartbeat_time;
 }
+
+public class GatewayMsg
+{
+    public int ContentType;
+    public int ProtocolType;
+    public byte[] Content;
+    public int ServiceId;
+    public int FuncId;
+}

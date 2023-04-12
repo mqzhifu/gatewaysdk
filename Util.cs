@@ -5,20 +5,20 @@ using UnityEngine;
 
 public class Util
 {
-    public static int debug;
-    public static void SetDebug(int debugFlag)
-    {
-        debug = debugFlag;
-    }
+    //public static int debug;
+    //public static void SetDebug(int debugFlag)
+    //{
+    //    debug = debugFlag;
+    //}
 
-    public static void Log(string info)
-    {
-        if (debug == 1)
-        {
-            Debug.Log(info);
-        }
+    //public static void Log(string info)
+    //{
+    //    if (debug == 1)
+    //    {
+    //        Debug.Log(info);
+    //    }
         
-    }
+    //}
 
 
     public static long GetTimestamp()
