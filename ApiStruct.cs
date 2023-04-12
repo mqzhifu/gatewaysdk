@@ -1,5 +1,8 @@
 using System.Collections.Generic;
 
+//一此公共结构体
+
+
 public class UserLoginReq 
 {
     public string username;

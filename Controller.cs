@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Threading.Tasks;
 
+//入口文件
 public class Controller 
 {
     public Log log;
@@ -11,16 +12,17 @@ public class Controller
     public Gateway gateway;
     public ApiLogicAwait apiLogicAwait;
     public ProtocolAction protocolAction;
-
-    public Controller()
+    public int logLevel;
+    public Controller(int logLevel)
     {
-        this.log = new Log(1, "Controller ");
+        this.log = new Log(logLevel, "Controller ");
+        this.logLevel = logLevel;
     }
-
+    //使用 http 组件 
     public void UseHttp(string dns, string sourceType, string projectId, string access, string username, string password)
     {
-        this.httpUtil = new HttpUtil(dns, sourceType, projectId, access);
-        this.apiLogicAwait = new ApiLogicAwait(this.httpUtil);
+        this.httpUtil = new HttpUtil(dns, sourceType, projectId, access,this.logLevel);
+        this.apiLogicAwait = new ApiLogicAwait(this.httpUtil,this.logLevel);
         this.apiLogicAwait.SetUserInfo(username,password);
         this.apiLogicAwait.InitLogin();
         int retryTime = 0;//超时时间
@@ -41,7 +43,7 @@ public class Controller
             return;
         }
     }
-
+    //使用网关组件
     public void UseGateway(int contentType, int protocolType, BackMsg backMsg)
     {
         if (this.httpUtil == null)
@@ -54,11 +56,11 @@ public class Controller
             this.throwExpception("ApiLogicAwait.API_LOGIC_INIT_STATUS != SUCCESS");
         }
 
-        this.protocolAction = new ProtocolAction();
+        this.protocolAction = new ProtocolAction(this.logLevel);
         this.apiLogicAwait.SetProtocolAction(this.protocolAction);
         this.apiLogicAwait.InitGateway();
 
-        this.gateway = new Gateway();
+        this.gateway = new Gateway(this.logLevel);
         //try
         //{
         //    this.gateway.Init(contentType, protocolType,this.apiLogicAwait.gatewayConfig, this.protocolAction,this.apiLogicAwait.userToken,backMsg);

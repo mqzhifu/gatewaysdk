@@ -18,7 +18,7 @@ using static UnityEditor.VersionControl.Asset;
 
 
 
-
+//websocket 协议类，消息的收发
 public class Websocket
 {
     public GatewayConfig gatewayConfig;
@@ -36,9 +36,9 @@ public class Websocket
         SUCCESS = 3,
     }
 
-    public Websocket(GatewayConfig gatewayConfig, GatewayReceiveMsg callback, ConnSuccess back)
+    public Websocket(GatewayConfig gatewayConfig, GatewayReceiveMsg callback, ConnSuccess back,int logLevel)
     {
-        this.log = new Log(1, "Websocket  ");
+        this.log = new Log(logLevel, "Websocket  ");
         this.gatewayConfig = gatewayConfig;
         this.gatewayReceiveMsg = callback;
         this.connSuccessBack = back;

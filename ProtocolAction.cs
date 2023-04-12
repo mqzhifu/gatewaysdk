@@ -22,14 +22,14 @@ public class ActionMapItem
     public string   desc;
 
 }
-
+//长连接所有协议的映射与描述
 public class ProtocolAction
 {
     public Log log;
     public ProtocolActionMap map;
-    public ProtocolAction()
+    public ProtocolAction(int logLevel)
     {
-        this.log = new Log(1, "ProtocolAction  ");
+        this.log = new Log(logLevel, "ProtocolAction  ");
     }
 
     public void SetMap(ProtocolActionMap protocolActionMap)

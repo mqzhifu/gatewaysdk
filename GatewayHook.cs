@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using Google.Protobuf;
 using UnityEngine;
 
+
+//网关类如果进入稳定期后，基本不会改了，而需要发动的部分就在这里了
 public class GatewayHook
 {
 

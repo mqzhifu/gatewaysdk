@@ -9,7 +9,7 @@ using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Net.WebSockets;
 
-
+//测试：UNITY 入口
 using Debug = UnityEngine.Debug;
 using System;
 
@@ -22,9 +22,10 @@ public class Core : MonoBehaviour
    
     void Start()
     {
-        this.log = new Log(1,"core");
+        var logLevel = 15;
+        this.log = new Log(logLevel, "core");
         this.log.Info("start:");
-        this.controller = new Controller();
+        this.controller = new Controller(logLevel);
         this.controller.UseHttp("http://8.142.177.235:2222/", "11", "6", "imzgoframe", "frame_sync_1", "123456");
         this.controller.UseGateway((int)Gateway.CONTENT_TYPE.PROTOBUF, (int)Gateway.PROTOCOL_TYPE.WS, null);
         this.log.Info("finish.");

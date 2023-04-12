@@ -24,6 +24,7 @@ public delegate void ConnSuccess();
 //把从服务端接收到的消息，回调给：调用者
 public delegate void BackMsg(GatewayMsg msg);
 
+//网关类，主要是长连接收发消息
 public class Gateway
 {
 
@@ -37,7 +38,7 @@ public class Gateway
     private GatewayUtil gatewayUtil;//工具类，拆包/解包
 
     public Websocket websocket;
-    
+    public int logLevel;
     public GatewayHook gatewayHook;
     public int loginStatus;//登陆状态：长连接建立成功后，需要登陆验证成功后，才可以有后续操作
     public BackMsg backMsg;
@@ -64,9 +65,10 @@ public class Gateway
 
     }
     //构造函数
-    public Gateway()
+    public Gateway(int logLevel)
     {
-        this.log = new Log(1, "Gateway ");
+        this.logLevel = logLevel;
+        this.log = new Log(logLevel, "Gateway ");
         this.backMsg = null;
         this.gatewayUtil = new GatewayUtil();
         this.gatewayHook = new GatewayHook();
@@ -90,7 +92,7 @@ public class Gateway
         {
             this.log.Info(" init ws connet...");
             //建立长连接
-            this.websocket = new Websocket(this.gatewayConfig , this.ReceiveMsg,this.ConnSuccessBack);
+            this.websocket = new Websocket(this.gatewayConfig , this.ReceiveMsg,this.ConnSuccessBack,this.logLevel);
             this.websocket.Init();
         }
         else

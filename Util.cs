@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+//工具类（公共）
 public class Util
 {
     //public static int debug;
@@ -16,8 +17,7 @@ public class Util
     //    if (debug == 1)
     //    {
     //        Debug.Log(info);
-    //    }
-        
+    //    }        
     //}
 
 

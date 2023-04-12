@@ -5,11 +5,12 @@ using LitJson;
 using Unity.VisualScripting;
 using Unity.VisualScripting.FullSerializer;
 using UnityEditor.Experimental.GraphView;
+using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.Networking;
 using static System.Collections.Specialized.BitVector32;
 
-
+//处理所有请求后端API的逻辑
 public class ApiLogicAwait
 {
     public enum API_LOGIC_INIT_STATUS
@@ -33,9 +34,9 @@ public class ApiLogicAwait
     public ProtocolAction   protocolAction; //长连接的协议定义中的函数映射
     public Websocket        websocket;      //基础ws类
     //构造函数
-    public ApiLogicAwait(HttpUtil httpUtil)
+    public ApiLogicAwait(HttpUtil httpUtil,int logLevel)
     {
-        this.log = new Log(1, "ApiLogicAwait  ");
+        this.log = new Log(logLevel, "ApiLogicAwait  ");
 
         this.log.Info("start:");
 
@@ -130,7 +131,7 @@ public class ApiLogicAwait
     public string LoginBack(JsonData jsonData)
     {
         UserLoginRes userLoginRes = JsonMapper.ToObject<UserLoginRes>(jsonData["data"].ToJson());
-        this.log.Info("LoginBack ,uid:" + userLoginRes.user.id + " , token:" + userLoginRes.token);
+        this.log.debug("LoginBack ,uid:" + userLoginRes.user.id + " , token:" + userLoginRes.token);
 
         this.userId = userLoginRes.user.id;
         this.userToken = userLoginRes.token;

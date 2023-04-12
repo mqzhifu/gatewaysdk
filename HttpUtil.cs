@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 public delegate string Callback(long responseCode, JsonData jsonData);
 
+//处理HTTP协议 请求/响应
 public class HttpUtil
 {
     public string serverHttpDns;//后端服务器的 HTTP 地址+端口
@@ -19,9 +20,9 @@ public class HttpUtil
     public string access;       //项目的请求密钥
     public Log log;             //日志输出
 
-    public HttpUtil(string dns, string sourceType, string projectId, string access)
+    public HttpUtil(string dns, string sourceType, string projectId, string access,int logLevel)
     {
-        this.log = new Log(1, "HttpUtil  ");
+        this.log = new Log(logLevel, "HttpUtil  ");
 
         this.serverHttpDns = dns;
         this.userToken = "";
@@ -113,12 +114,11 @@ public class HttpUtil
         JsonData jd = null;
         if (req.result == UnityWebRequest.Result.Success)
         {     
-            this.log.Info("request ok , response body string:" + req.downloadHandler.text);
+            this.log.debug("request ok , response body string:" + req.downloadHandler.text);
             jd = JsonMapper.ToObject(req.downloadHandler.text);
             if ((int)(jd["code"]) != 200)
             {
                 string errInfo = "commonResponse has err . code:" + jd["code"] + " , msg:" + jd["msg"];
-                //this.log.Info(errInfo);
                 this.throwExpception(errInfo);
                 throw new Exception(errInfo);
             }
@@ -131,9 +131,7 @@ public class HttpUtil
         else
         {
             string errInfo = "request failed ，error: " + req.error + " , result: " + req.result + "  , responseCode: " + req.responseCode;
-            //this.log.Info(errInfo);
-            this.throwExpception(errInfo);
-            //throw new Exception(errInfo);           
+            this.throwExpception(errInfo);          
         }
         return jd;
     }
