@@ -13,6 +13,7 @@ using static System.Collections.Specialized.BitVector32;
 //处理所有请求后端API的逻辑
 public class ApiLogicAwait
 {
+    //登陆状态
     public enum API_LOGIC_INIT_STATUS
     {
         EXCEPTION = -1,   //初始化失败，大多是接口请求异常,
@@ -24,8 +25,8 @@ public class ApiLogicAwait
     public int      initTimeout;        //初始化时，要请求后端接口，正常2秒内肯定是能完成的，超时后就证明有问题了
     public int      userId;             //用户ID
     public string   userToken;          //用户登陆成功的 token
-    public string   username;           //用户名
-    public string   password;           //用户密码
+    //public string   username;           //用户名
+    //public string   password;           //用户密码
     public int      initStatus;         //当前初始化的状态:-1发生错误，0未处理，1处理中，2成功
 
     public Log              log;            //日志输出
@@ -40,11 +41,11 @@ public class ApiLogicAwait
 
         this.log.Info("start:");
 
-        this.initTimeout    = 2;
-        this.userId         = 0;
+        this.initTimeout    = 2 ;
+        this.userId         = 0 ;
         this.userToken      = "";
-        this.username       = "";
-        this.password       = "";
+        //this.username       = "";
+        //this.password       = "";
         this.httpUtil       = httpUtil;
         
         this.initStatus     = (int)API_LOGIC_INIT_STATUS.UN_PROCESS;
@@ -57,55 +58,45 @@ public class ApiLogicAwait
         this.protocolAction = protocolAction;
     }
 
-    public void SetUserInfo(string username, string password)
-    {
-        this.username = username;
-        this.password = password;
-    }
+    //public void SetUserInfo(string username, string password)
+    //{
+    //    this.username = username;
+    //    this.password = password;
+    //}
 
 
-    public void InitLogin()
-    {
-        this.initStatus = (int)API_LOGIC_INIT_STATUS.PROCESSING;
-        this.Login();
-        this.initStatus = (int)API_LOGIC_INIT_STATUS.SUCCESS;
-        //try
-        //{
-        //    this.Login();
-        //    this.GetActionMap();
-        //    this.GetConfig();
-        //    this.initStatus = (int)API_LOGIC_INIT_STATUS.SUCCESS;
-
-        //}
-        //catch (Exception e)
-        //{
-        //    this.log.Info("im in exception "+e.Message);
-        //    this.initStatus = (int)API_LOGIC_INIT_STATUS.EXCEPTION;
-        //}
-
-    }
+    //public void InitLogin()
+    //{
+    //    this.initStatus = (int)API_LOGIC_INIT_STATUS.PROCESSING;
+    //    this.LoginBlock();
+    //    this.initStatus = (int)API_LOGIC_INIT_STATUS.SUCCESS;
+    //}
     public void InitGateway()
     {
         this.GetActionMap();
         this.GetConfig();
     }
+
     //登陆
-    public int Login()
+    public void LoginBlock(string username, string password)
     {
-        //this.log.Info("im in login func.");
+        this.initStatus = (int)API_LOGIC_INIT_STATUS.PROCESSING;
+        if (username == "" || password == "")
+        {
+            this.throwExpception("username | password  is empty!");
+        }
         string uri = "base/login";
 
         UserLoginReq userLogin = new UserLoginReq();
-        userLogin.username = this.username;
-        userLogin.password = this.password;
+        userLogin.username = username;
+        userLogin.password = password;
         string jsonStr = JsonMapper.ToJson(userLogin);
 
+        var jd = this.httpUtil.RequestBlock("POST", uri, jsonStr);
 
-        JsonData jd =  this.httpUtil.RequestBlock("POST", uri, jsonStr);
+        
         this.LoginBack(jd);
-
-        return 1;
-        //this.httpUtil.Request(uri, jsonStr, cb);
+        this.initStatus = (int)API_LOGIC_INIT_STATUS.SUCCESS;
 
     }
     //获取 - 长连接的函数映射表
@@ -153,6 +144,12 @@ public class ApiLogicAwait
         //this.websocket = new Websocket();
         //this.websocket.Init(this.gatewayConfig);
         return "";
+    }
+
+    public void throwExpception(string errInfo)
+    {
+        this.log.Err(errInfo);
+        throw new Exception(errInfo);
     }
 
     //public void print(object message)

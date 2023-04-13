@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -38,6 +40,7 @@ public class Gateway
     private GatewayUtil gatewayUtil;//工具类，拆包/解包
 
     public Websocket websocket;
+    public Tcp Tcp;
     public int logLevel;
     public GatewayHook gatewayHook;
     public int loginStatus;//登陆状态：长连接建立成功后，需要登陆验证成功后，才可以有后续操作
@@ -62,7 +65,6 @@ public class Gateway
         ING = 2,
         FAILED = 3,
         SUCCESS = 4,
-
     }
     //构造函数
     public Gateway(int logLevel)
@@ -92,13 +94,14 @@ public class Gateway
         {
             this.log.Info(" init ws connet...");
             //建立长连接
-            this.websocket = new Websocket(this.gatewayConfig , this.ReceiveMsg,this.ConnSuccessBack,this.logLevel);
+            this.websocket = new Websocket(this.gatewayConfig, this.ReceiveMsg, this.ConnSuccessBack, this.logLevel);
             this.websocket.Init();
         }
         else
         {
-
-        }     
+            this.Tcp = new Tcp(gatewayConfig,null,null,this.logLevel);
+            this.Tcp.Init();
+        }
     }
     //长连接建立成功后，回调此函数
     public void ConnSuccessBack()
@@ -216,6 +219,7 @@ public class Gateway
         else
         {
 
+            
         }
 
     }

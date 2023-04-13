@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 public delegate string Callback(long responseCode, JsonData jsonData);
 
 //处理HTTP协议 请求/响应
+//此类会抛异常，注意外层调用时要捕捉~
 public class HttpUtil
 {
     public string serverHttpDns;//后端服务器的 HTTP 地址+端口
@@ -126,7 +127,6 @@ public class HttpUtil
             {
                 return jd;
             }
-
         }
         else
         {

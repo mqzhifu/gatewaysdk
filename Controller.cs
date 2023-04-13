@@ -23,8 +23,17 @@ public class Controller
     {
         this.httpUtil = new HttpUtil(dns, sourceType, projectId, access,this.logLevel);
         this.apiLogicAwait = new ApiLogicAwait(this.httpUtil,this.logLevel);
-        this.apiLogicAwait.SetUserInfo(username,password);
-        this.apiLogicAwait.InitLogin();
+        //this.apiLogicAwait.SetUserInfo(username,password);
+        this.apiLogicAwait.LoginBlock(username, password);
+    }
+
+    public int TestLoginFailed()
+    {
+        return -1;
+    }
+
+    public void HttpAsyncLogin()
+    {
         int retryTime = 0;//超时时间
         while (this.apiLogicAwait.initStatus == (int)ApiLogicAwait.API_LOGIC_INIT_STATUS.PROCESSING)
         {
@@ -61,15 +70,6 @@ public class Controller
         this.apiLogicAwait.InitGateway();
 
         this.gateway = new Gateway(this.logLevel);
-        //try
-        //{
-        //    this.gateway.Init(contentType, protocolType,this.apiLogicAwait.gatewayConfig, this.protocolAction,this.apiLogicAwait.userToken,backMsg);
-        //}
-        //catch (Exception e)
-        //{
-        //    Debug.Log("=======" + e.Message);
-        //    this.log.Err(e.Message);
-        //}
         this.gateway.Init(contentType, protocolType, this.apiLogicAwait.gatewayConfig, this.protocolAction, this.apiLogicAwait.userToken, backMsg);
     }
 
