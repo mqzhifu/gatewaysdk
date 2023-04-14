@@ -99,7 +99,7 @@ public class Gateway
         }
         else
         {
-            this.Tcp = new Tcp(gatewayConfig,null,null,this.logLevel);
+            this.Tcp = new Tcp(gatewayConfig, this.ReceiveMsg, this.ConnSuccessBack, this.logLevel);
             this.Tcp.Init();
         }
     }

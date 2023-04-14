@@ -30,7 +30,8 @@ public class Tcp
 
         this.tcpClient = new System.Net.Sockets.TcpClient();
         this.tcpClient.Connect(IPAddress.Parse(gatewayConfig.outIp), int.Parse(gatewayConfig.tcpPort));
-        //this.StartRead();
+        this.connSuccessBack();
+        this.StartRead();
 
     }
 
@@ -49,8 +50,10 @@ public class Tcp
             return;
         }
         byte[] buffer = new byte[1024 * 10];
-        string str = Encoding.UTF8.GetString(buffer, 0, len);
+        var msgByte = Util.ByteSubstr(buffer,0, len);
+        //string str = Encoding.UTF8.GetString(buffer, 0, len);
         //doing something
+        this.gatewayReceiveMsg(msgByte);
         this.StartRead();
 
     }
