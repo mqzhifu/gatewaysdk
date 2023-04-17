@@ -23,7 +23,6 @@ public class Controller
     {
         this.httpUtil = new HttpUtil(dns, sourceType, projectId, access,this.logLevel);
         this.apiLogicAwait = new ApiLogicAwait(this.httpUtil,this.logLevel);
-        //this.apiLogicAwait.SetUserInfo(username,password);
         this.apiLogicAwait.LoginBlock(username, password);
     }
 
@@ -52,24 +51,26 @@ public class Controller
             return;
         }
     }
-    //使用网关组件
+    //使用网关组件，它强依赖 apiLogicAwait ，且 apiLogicAwait 要登陆成功
     public void UseGateway(int contentType, int protocolType, BackMsg backMsg)
     {
         if (this.httpUtil == null)
         {
             this.throwExpception("httpUtil null");
         }
-
+        // apiLogicAwait 要登陆成功
         if (this.apiLogicAwait.initStatus != (int)ApiLogicAwait.API_LOGIC_INIT_STATUS.SUCCESS)
         {
             this.throwExpception("ApiLogicAwait.API_LOGIC_INIT_STATUS != SUCCESS");
         }
 
-        this.protocolAction = new ProtocolAction(this.logLevel);
+        this.protocolAction = new ProtocolAction(this.logLevel);//创建长连接自定义协议管理类
         this.apiLogicAwait.SetProtocolAction(this.protocolAction);
+        //请求 HTTP 获取后端的配置数据，这里最好捕获一下异常。
         this.apiLogicAwait.InitGateway();
 
         this.gateway = new Gateway(this.logLevel);
+        //这里最好捕获一下异常，比如：创建连接失败
         this.gateway.Init(contentType, protocolType, this.apiLogicAwait.gatewayConfig, this.protocolAction, this.apiLogicAwait.userToken, backMsg);
     }
 

@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Google.Protobuf;
 using LitJson;
 using Pb;
@@ -21,10 +22,14 @@ using static UnityEditor.VersionControl.Asset;
 
 //长连接收到消息后，回调
 public delegate void GatewayReceiveMsg(byte[] readBuff);
-//长连接建立连接成功后，回调
-public delegate void ConnSuccess();
+//长连接建立连接后，回调
+public delegate void ConnectCallback(int status,string msg);
+//长连接建立连接后，回调
+public delegate void FDExceptionCallback( string msg);
 //把从服务端接收到的消息，回调给：调用者
 public delegate void BackMsg(GatewayMsg msg);
+
+
 
 //网关类，主要是长连接收发消息
 public class Gateway
@@ -40,11 +45,22 @@ public class Gateway
     private GatewayUtil gatewayUtil;//工具类，拆包/解包
 
     public Websocket websocket;
-    public Tcp Tcp;
+    public Tcp tcp;
     public int logLevel;
     public GatewayHook gatewayHook;
     public int loginStatus;//登陆状态：长连接建立成功后，需要登陆验证成功后，才可以有后续操作
     public BackMsg backMsg;
+    public int connectTimeout;     //创建连接时：超时时间(秒)
+    public bool stopHeartbeat;
+
+    public enum CONN_STATE
+    {
+        INIT        = 1,//初始化
+        ING         = 2,//连接中
+        FAILED      = 3,//连接失败
+        SUCCESS     = 4,//连接成功
+        DISCONNECT  = 5,//连接已断开
+    }
 
     //传输内容的格式体
     public enum CONTENT_TYPE
@@ -56,14 +72,14 @@ public class Gateway
     public enum PROTOCOL_TYPE
     {
         TCP = 1,
-        WS = 2,
+        WS  = 2,
     }
     //登陆状态
     public enum LOGIN_STATUS
     {
-        INIT = 1,
-        ING = 2,
-        FAILED = 3,
+        INIT    = 1,
+        ING     = 2,
+        FAILED  = 3,
         SUCCESS = 4,
     }
     //构造函数
@@ -75,10 +91,11 @@ public class Gateway
         this.gatewayUtil = new GatewayUtil();
         this.gatewayHook = new GatewayHook();
         this.loginStatus = (int)Gateway.LOGIN_STATUS.INIT;
+        this.connectTimeout = 2;
 
 
     }
-    //初始化，连接后端服务器
+    //初始化，开始连接后端服务器
     public void Init(int contentType, int protocolType, GatewayConfig gatewayConfig, ProtocolAction protocolAction, string userToken, BackMsg backMsg)
     {
         this.CheckConstructor(contentType, protocolType, gatewayConfig, protocolAction, userToken);
@@ -92,21 +109,45 @@ public class Gateway
 
         if (this.protocolType == (int)Gateway.PROTOCOL_TYPE.WS)
         {
-            this.log.Info(" init ws connet...");
+            this.log.Info(" init ws connect...");
             //建立长连接
-            this.websocket = new Websocket(this.gatewayConfig, this.ReceiveMsg, this.ConnSuccessBack, this.logLevel);
+            this.websocket = new Websocket(this.gatewayConfig, this.ReceiveMsg, this.ConnectCallback, this.logLevel, (int)Websocket.WS_PROTOCOL.WS,this.connectTimeout,this.FDException);
             this.websocket.Init();
         }
         else
         {
-            this.Tcp = new Tcp(gatewayConfig, this.ReceiveMsg, this.ConnSuccessBack, this.logLevel);
-            this.Tcp.Init();
+            //this.Tcp = new Tcp(gatewayConfig, this.ReceiveMsg, this.ConnSuccessBack, this.logLevel);
+            //this.Tcp.Init();
         }
     }
-    //长连接建立成功后，回调此函数
-    public void ConnSuccessBack()
+    public void FDException(string msg )
     {
-        this.CS_Login();
+        this.stopHeartbeat = true;
+    }
+    //获取当前长连接的状态
+    public int GetConnectStatus()
+    {
+        if (this.protocolType == (int)Gateway.PROTOCOL_TYPE.WS)
+        {
+            return this.websocket.state;
+        }
+        else
+        {
+            return this.tcp.state;
+        }
+    }
+    //创建连接：成功/失败，后，回调此函数（即使失败，也会回调，因为其内部有定时器）
+    public void ConnectCallback(int status, string msg)
+    {
+        if (status == (int)Gateway.CONN_STATE.SUCCESS)
+        {
+            this.CS_Login();
+        }
+        else
+        {
+            this.throwExpception("connect failed , msgL:"+msg);
+        }
+        
     }
     //接收后端发送的消息
     public void ReceiveMsg(byte[] readBuff)
@@ -136,6 +177,8 @@ public class Gateway
                 else
                 {
                     this.log.Info("login success.");
+                    this.stopHeartbeat = false;
+                    this.Heartbeat();
                     this.loginStatus = (int)Gateway.LOGIN_STATUS.SUCCESS;
                 }
                 break;
@@ -172,6 +215,35 @@ public class Gateway
                 Debug.Log("no hit.");
                 break;
         }
+    }
+
+    public void Close()
+    {
+        this.stopHeartbeat = true;
+        if (this.protocolType == (int)Gateway.PROTOCOL_TYPE.WS)
+        {
+            this.websocket.Close();
+        }
+        else
+        {
+            this.tcp.Close();
+        }
+    }
+
+
+    public void Heartbeat()
+    {
+        //while (true)
+        //{
+        //    if (this.GetConnectStatus() != (int)Gateway.CONN_STATE.SUCCESS || this.stopHeartbeat)
+        //    {
+        //        this.log.Info("start Heartbeat");
+        //        break;
+        //    }
+
+            this.CS_Ping();
+        //    System.Threading.Tasks.Task.Delay(3000);
+        //}
     }
     //发送一条消息给后端(通过ID)
     public void SendMsgById(int serviceId, int funcId, byte[] content)
@@ -228,7 +300,7 @@ public class Gateway
     {
         this.loginStatus = (int)Gateway.LOGIN_STATUS.ING;
         var pbLogin = new Pb.Login();
-        //pbLogin.Token = "aaaa";
+        //pbLogin.Token = "aaaa";//测试登陆失败
         pbLogin.Token = this.userToken;
         var compressionContent = this.CompressionContent(this.contentType, pbLogin);
         this.SendMsgById(90, 104, compressionContent);
@@ -239,9 +311,9 @@ public class Gateway
         var pingReq = new Pb.PingReq();
         pingReq.ClientReqTime = Util.GetTimestamp();
 
+
         var compressionContent = this.CompressionContent(this.contentType, pingReq);
         this.SendMsgById(90, 106, compressionContent);
-
     }
 
     //=============================偏简单功能性的函数=============================
@@ -253,8 +325,9 @@ public class Gateway
         if (this.contentType == (int)Gateway.CONTENT_TYPE.JSON)
         {
             var str = c.ToString();
-            //Debug.Log(str);
-            return System.Text.Encoding.GetEncoding("UTF8").GetBytes(str);
+            Debug.Log(str);
+            //return System.Text.Encoding.GetEncoding("UTF8").GetBytes(str);
+            return System.Text.Encoding.Default.GetBytes(str);
         }
         else
         {

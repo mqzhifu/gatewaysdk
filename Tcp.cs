@@ -12,15 +12,18 @@ public class Tcp
     public GatewayConfig gatewayConfig;
     public GatewayReceiveMsg gatewayReceiveMsg;
     public Log log;
-    public ConnSuccess connSuccessBack;
+    public ConnectCallback connectCallback;
     public System.Net.Sockets.TcpClient tcpClient;
-    public Tcp(GatewayConfig gatewayConfig, GatewayReceiveMsg callback, ConnSuccess back, int logLevel)
+    public int state;             //当前连接状态
+
+    public Tcp(GatewayConfig gatewayConfig, GatewayReceiveMsg callback, ConnectCallback back, int logLevel)
     {
+        this.state = (int)Gateway.CONN_STATE.INIT;
         this.log = new Log(logLevel, "Tcp  ");
 
         this.gatewayConfig      = gatewayConfig;
         this.gatewayReceiveMsg  = callback;
-        this.connSuccessBack    = back;
+        this.connectCallback = back;
     }
 
     public void Init()
@@ -28,11 +31,21 @@ public class Tcp
         string dns = gatewayConfig.outIp + ":" + gatewayConfig.tcpPort;
         this.log.Info("dns" + dns);
 
-        this.tcpClient = new System.Net.Sockets.TcpClient();
-        this.tcpClient.Connect(IPAddress.Parse(gatewayConfig.outIp), int.Parse(gatewayConfig.tcpPort));
-        this.connSuccessBack();
-        this.StartRead();
+        this.state = (int)Gateway.CONN_STATE.ING;
 
+        this.tcpClient = new System.Net.Sockets.TcpClient();
+        try
+        {
+            this.tcpClient.Connect(IPAddress.Parse(gatewayConfig.outIp), int.Parse(gatewayConfig.tcpPort));
+            this.connectCallback((int)Gateway.CONN_STATE.SUCCESS, "SUCCESS");
+            this.StartRead();
+        }
+        catch (Exception e)
+        {
+            this.state = (int)Gateway.CONN_STATE.FAILED;
+            this.connectCallback((int)Gateway.CONN_STATE.FAILED, e.Message);
+        }               
+      
     }
 
     public void StartRead()
@@ -63,5 +76,9 @@ public class Tcp
         tcpClient.GetStream().BeginWrite(msgBytes, 0, msgBytes.Length, (ar) => {
             tcpClient.GetStream().EndWrite(ar);//结束异步发送
         }, null);
+    }
+    public void Close()
+    {
+
     }
 }

@@ -57,26 +57,12 @@ public class ApiLogicAwait
     {
         this.protocolAction = protocolAction;
     }
-
-    //public void SetUserInfo(string username, string password)
-    //{
-    //    this.username = username;
-    //    this.password = password;
-    //}
-
-
-    //public void InitLogin()
-    //{
-    //    this.initStatus = (int)API_LOGIC_INIT_STATUS.PROCESSING;
-    //    this.LoginBlock();
-    //    this.initStatus = (int)API_LOGIC_INIT_STATUS.SUCCESS;
-    //}
+    //初始化 成员变量，主要是请求 HTTP 获取后端的配置数据
     public void InitGateway()
     {
         this.GetActionMap();
         this.GetConfig();
     }
-
     //登陆
     public void LoginBlock(string username, string password)
     {
