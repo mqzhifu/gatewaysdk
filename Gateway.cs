@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Protobuf;
@@ -19,6 +20,7 @@ using static Unity.IO.LowLevel.Unsafe.AsyncReadManagerMetrics;
 using static UnityEditor.MaterialProperty;
 using static UnityEditor.Progress;
 using static UnityEditor.VersionControl.Asset;
+using static UnityEngine.TouchScreenKeyboard;
 
 //长连接收到消息后，回调
 public delegate void GatewayReceiveMsg(byte[] readBuff);
@@ -196,19 +198,22 @@ public class Gateway
                 break;
             case "90116"://SC_Pong
                 var contentObj = this.gatewayHook.ParserSC_Pong(contentType, msg.Content);
+                this.log.debug("SC_Pong:"+ contentObj.ServerReceiveTime);
+                this.CS_ProjectPushMsg("test unity send msg from c# script");
                 break;
             case "90120"://SC_KickOff
                 var kickOff = this.gatewayHook.ParserSC_KickOff(contentType, msg.Content);
                 this.log.Info("ws conn has kickOff");
                 break;
-            case "90122"://SC_ProjectPushMsg
+            case "90124"://SC_ProjectPushMsg
                 var projectPushMsg = this.gatewayHook.ParserSC_ProjectPushMsg(contentType, msg.Content);
+                this.log.debug("projectPushMsg content:"+ projectPushMsg.Content);
                 if (this.backMsg != null)
                 {
                     this.backMsg(msg);
                 }
                 break;
-            case "90124"://SC_SendMsg
+            case "90126"://SC_SendMsg
                 var pb_msg = this.gatewayHook.ParserSC_SendMsg(contentType, msg.Content);
                 break;
             default:
@@ -228,6 +233,17 @@ public class Gateway
         {
             this.tcp.Close();
         }
+    }
+
+    public void CS_ProjectPushMsg(string content)
+    {
+        var projectPushMsg = new Pb.ProjectPushMsg();
+        projectPushMsg.SourceProjectId = 6;
+        projectPushMsg.TargetProjectId = 6;
+        projectPushMsg.TargetUids = "1,2";
+        projectPushMsg.Content = content;
+        var str = this.CompressionContent(this.contentType,projectPushMsg);
+        this.SendMsgById(90,122,str);
     }
 
 
@@ -310,7 +326,8 @@ public class Gateway
     {
         var pingReq = new Pb.PingReq();
         pingReq.ClientReqTime = Util.GetTimestamp();
-
+        //Int32 unixTimestamp = (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+        //pingReq.ClientReqTime = unixTimestamp;
 
         var compressionContent = this.CompressionContent(this.contentType, pingReq);
         this.SendMsgById(90, 106, compressionContent);
@@ -324,8 +341,26 @@ public class Gateway
         //Debug.Log("CompressionContent contentType:" + contentType);
         if (this.contentType == (int)Gateway.CONTENT_TYPE.JSON)
         {
+            //var jsonS = JsonFormatter.Default.Format(c);
+            //this.log.debug("========"+ jsonS);
             var str = c.ToString();
             Debug.Log(str);
+            Regex r = new Regex(@"""\d{13}""");
+            Match m = r.Match(str);
+            Debug.Log("m.Success:" + m.Success);
+            if (m.Success)
+            {
+                this.log.debug("match index:"+m.Index );
+                var startStr = str.Substring(0,m.Index - 1);
+                var middleStr = str.Substring(m.Index+1,13);
+                var endStr = str.Substring(m.Index + 13 + 2);
+
+                var newStr = startStr + middleStr + endStr;
+                this.log.debug("newStr:" + newStr);
+                str = newStr;
+
+
+            }
             //return System.Text.Encoding.GetEncoding("UTF8").GetBytes(str);
             return System.Text.Encoding.Default.GetBytes(str);
         }
