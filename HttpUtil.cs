@@ -19,41 +19,53 @@ public class HttpUtil
     public string sourceType;   //来源，即当前设备
     public string projectId;    //项目ID
     public string access;       //项目的请求密钥
+    public int timeout;         //请求超时时间
     public Log log;             //日志输出
+
+    /*构造函数
+     * dns:服务端URL地址，如：http://www.baidu.com/
+     * sourceType:
+     *  11 //MAC台式浏览器
+        12 //MAC台式APP
+        22 //WIN台式浏览器
+        23 //WIN台式APP
+        31 //安卓手机浏览器
+        32 //安卓手机APP
+        41 //IOS手机浏览器
+        42 //IOS手机APP
+        99 //未知
+     * projectId:项目ID，向后台管理员申请
+     * access:http头基础的验证，向后台管理员申请
+     * username:用户名
+     * password:密码
+     */
 
     public HttpUtil(string dns, string sourceType, string projectId, string access,int logLevel)
     {
         this.log = new Log(logLevel, "HttpUtil  ");
 
-        this.serverHttpDns = dns;
-        this.userToken = "";
-        this.access = access;
-        this.sourceType = sourceType;
-        this.projectId = projectId;
-    }
-    //用于测试，方便初始化一些基础信息
-    public void TestSetVar()
-    {
-        this.serverHttpDns = "http://8.142.177.235:2222/";
-        this.access = "imzgoframe";
-        this.projectId = "6";
-        this.sourceType = "11";
-    }
-    public void Check()
-    {
-        if (this.serverHttpDns == "" || this.sourceType == "" || this.projectId == "" || this.access == "")
-        {
-            this.throwExpception("serverHttpDns || sourceType || projectId || access is empty!");
-        }
+        this.serverHttpDns  = dns;
+        this.userToken      = "";
+        this.access         = access;
+        this.sourceType     = sourceType;
+        this.projectId      = projectId;
+        this.timeout        = 2;
     }
     //发送请求，阻塞模式
     public JsonData RequestBlock(string HttpMethod, string uri, string jsonStr)
     {
         UnityWebRequest req = this.GetUnityWebRequest(uri, HttpMethod, jsonStr,"block");
+        req.timeout = this.timeout * 1000;
         var  sendWebRequestContext = req.SendWebRequest();
+        //var time = 0;
         while (!sendWebRequestContext.isDone)
         {
             Task.Delay(100);
+            //time += 100;
+            //if (time > this.timeout)//共计2秒(20次)
+            //{
+            //    this.throwExpception("http request timeout second:"+2);
+            //}
         }
 
         JsonData jd = this.ProcessHttpBack(req);
@@ -103,7 +115,7 @@ public class HttpUtil
         }
         else
         {
-            this.throwExpception("HttpMethod wrong "+HttpMethod);
+            this.throwExpception("HttpMethod wrong: " + HttpMethod + " .only support:POST GET");
         }
 
         this.setCommonHeader(req);
@@ -149,6 +161,15 @@ public class HttpUtil
         req.SetRequestHeader("X-Access", this.access);
         req.SetRequestHeader("X-Token", this.userToken);
     }
+    //校验 url+ header参数
+    public void Check()
+    {
+        if (this.serverHttpDns == "" || this.sourceType == "" || this.projectId == "" || this.access == "")
+        {
+            this.throwExpception("serverHttpDns || sourceType || projectId || access is empty!");
+        }
+    }
+    //获取当前请求的 URL 地址
     public string GetUrl(string uri)
     {
         return this.serverHttpDns + uri;

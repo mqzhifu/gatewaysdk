@@ -23,7 +23,7 @@ using static UnityEditor.VersionControl.Asset;
 using static UnityEngine.TouchScreenKeyboard;
 
 //长连接收到消息后，回调
-public delegate void GatewayReceiveMsg(byte[] readBuff);
+public delegate void ReceiveMsgCallback(byte[] readBuff);
 //长连接建立连接后，回调
 public delegate void ConnectCallback(int status,string msg);
 //长连接建立连接后，回调
@@ -54,6 +54,9 @@ public class Gateway
     public BackMsg backMsg;
     public int connectTimeout;     //创建连接时：超时时间(秒)
     public bool stopHeartbeat;
+
+    public FDExceptionCallback fdExceptionCallback;
+    public ConnectCallback connectCallback;    //长连接，成功回调
 
     public enum CONN_STATE
     {
@@ -98,7 +101,7 @@ public class Gateway
 
     }
     //初始化，开始连接后端服务器
-    public void Init(int contentType, int protocolType, GatewayConfig gatewayConfig, ProtocolAction protocolAction, string userToken, BackMsg backMsg)
+    public void Init(int contentType, int protocolType, GatewayConfig gatewayConfig, ProtocolAction protocolAction, string userToken, BackMsg backMsg, ConnectCallback connectCallback, FDExceptionCallback fdExceptionCallback)
     {
         this.CheckConstructor(contentType, protocolType, gatewayConfig, protocolAction, userToken);
 
@@ -108,6 +111,8 @@ public class Gateway
         this.protocolAction = protocolAction;
         this.backMsg = backMsg;
         this.userToken = userToken;
+        this.fdExceptionCallback = fdExceptionCallback;
+        this.connectCallback = connectCallback;
 
         if (this.protocolType == (int)Gateway.PROTOCOL_TYPE.WS)
         {
@@ -125,6 +130,10 @@ public class Gateway
     public void FDException(string msg )
     {
         this.stopHeartbeat = true;
+        if (this.fdExceptionCallback!=null)
+        {
+            this.fdExceptionCallback(msg);
+        }
     }
     //获取当前长连接的状态
     public int GetConnectStatus()
@@ -143,6 +152,10 @@ public class Gateway
     {
         if (status == (int)Gateway.CONN_STATE.SUCCESS)
         {
+            if (this.connectCallback != null)
+            {
+                this.connectCallback(status, msg);
+            }
             this.CS_Login();
         }
         else

@@ -16,8 +16,12 @@ public class Test
         this.UseGateway();
         this.log.Info("finish.");
     }
+    //长连接，接收S端推送的公共消息
+    public void receiveMsg(GatewayMsg msg)
+    {
 
-    void UseHttp()
+    }
+    public void UseHttp()
     {
         //this.TestUseHttp();
         //return;
@@ -25,7 +29,7 @@ public class Test
         this.controller.UseHttp("http://8.142.177.235:2222/", "11", "6", "imzgoframe", "frame_sync_1", "123456");
     }
 
-    void UseGateway()
+    public void UseGateway()
     {
         //this.TestUseGateway();
         //return;
@@ -34,22 +38,37 @@ public class Test
         //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.PROTOBUF, (int)Gateway.PROTOCOL_TYPE.WS, null);
 
         //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.JSON, (int)Gateway.PROTOCOL_TYPE.TCP, null);
-        this.controller.UseGateway((int)Gateway.CONTENT_TYPE.JSON, (int)Gateway.PROTOCOL_TYPE.WS, null);
+        this.controller.UseGateway((int)Gateway.CONTENT_TYPE.JSON, (int)Gateway.PROTOCOL_TYPE.WS, this.receiveMsg,null,null);
     }
 
-    void TestUseGateway()
+    public void TestUseGateway()
     {
         //参数错误
         //this.controller.UseGateway(3, (int)Gateway.PROTOCOL_TYPE.TCP, null);
         //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.JSON, 4, null);
     }
 
-    void TestUseHttp()
+    public void TestUseHttp()
     {
         //测试参数为空
         //this.controller.UseHttp("", "11", "6", "imzgoframe", "", "123456");
         //测试登陆失败
         //this.controller.UseHttp("http://8.142.177.235:2222/", "11", "6", "imzgoframe", "1111", "44444");
+    }
+
+
+    public int TestLoginFailed()
+    {
+        return -1;
+    }
+
+    //用于测试，方便初始化一些基础信息
+    public void HttpUtil()
+    {
+        //this.serverHttpDns = "http://8.142.177.235:2222/";
+        //this.access = "imzgoframe";
+        //this.projectId = "6";
+        //this.sourceType = "11";
     }
 
 

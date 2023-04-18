@@ -10,13 +10,13 @@ using UnityEngine.UIElements;
 public class Tcp
 {
     public GatewayConfig gatewayConfig;
-    public GatewayReceiveMsg gatewayReceiveMsg;
+    public ReceiveMsgCallback gatewayReceiveMsg;
     public Log log;
     public ConnectCallback connectCallback;
     public System.Net.Sockets.TcpClient tcpClient;
     public int state;             //当前连接状态
 
-    public Tcp(GatewayConfig gatewayConfig, GatewayReceiveMsg callback, ConnectCallback back, int logLevel)
+    public Tcp(GatewayConfig gatewayConfig, ReceiveMsgCallback callback, ConnectCallback back, int logLevel)
     {
         this.state = (int)Gateway.CONN_STATE.INIT;
         this.log = new Log(logLevel, "Tcp  ");

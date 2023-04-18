@@ -19,8 +19,10 @@ public class Core : MonoBehaviour
 {       
     void Start()
     {
+        
         var logLevel = 15;
         var test = new Test(logLevel);
+
     }
     
     void Update()
