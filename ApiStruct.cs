@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 //一此公共结构体
@@ -62,3 +63,13 @@ public class GatewayMsg
     public int ServiceId;
     public int FuncId;
 }
+
+//public class HeartbeatItem
+//{
+//    public Int32    source_uid  ;
+//    public Int64    client_req_time  ;
+//    public Int64    client_receive_time  ;
+//    public Int64    server_receive_time  ;
+//    public Int64    server_response_time  ;
+//    public string   request_id  ;
+//}

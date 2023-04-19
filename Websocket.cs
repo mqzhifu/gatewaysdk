@@ -33,7 +33,7 @@ public class Websocket
 
     public enum WS_PROTOCOL
     {
-        WS = 1,
+        WS  = 1,
         WSS = 2,
     }
 
@@ -67,14 +67,13 @@ public class Websocket
             this.log.Info("ws connect success，"+ "clientWebSocket.State:" + this.clientWebSocket.State);
             this.state = (int)Gateway.CONN_STATE.SUCCESS;            
             this.ReceiveMsg();
+            this.connectCallback((int)Gateway.CONN_STATE.SUCCESS, "SUCCESS");
         }
         catch (Exception e)
         {
             this.state = (int)Gateway.CONN_STATE.FAILED;
             this.connectCallback((int)Gateway.CONN_STATE.FAILED, e.Message);
-        }
-        this.connectCallback((int)Gateway.CONN_STATE.SUCCESS, "SUCCESS");
-
+        }        
     }
     public string TestWongConnectDns()
     {
@@ -100,7 +99,7 @@ public class Websocket
     }
     public void Close()
     {
-        //this.clientWebSocket.CloseAsync();
+        this.clientWebSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None).Wait();
     }
     //接收后端发送的消息
     public async void ReceiveMsg()

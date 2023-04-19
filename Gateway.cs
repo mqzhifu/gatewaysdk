@@ -10,17 +10,11 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Protobuf;
+using Google.Protobuf.Collections;
 using LitJson;
 using Pb;
-using Unity.VisualScripting;
-using UnityEditor.PackageManager;
-using UnityEditor.VersionControl;
 using UnityEngine;
-using static Unity.IO.LowLevel.Unsafe.AsyncReadManagerMetrics;
-using static UnityEditor.MaterialProperty;
-using static UnityEditor.Progress;
-using static UnityEditor.VersionControl.Asset;
-using static UnityEngine.TouchScreenKeyboard;
+
 
 //长连接收到消息后，回调
 public delegate void ReceiveMsgCallback(byte[] readBuff);
@@ -36,27 +30,29 @@ public delegate void BackMsg(GatewayMsg msg);
 //网关类，主要是长连接收发消息
 public class Gateway
 {
+    public Log log;
+    public GatewayConfig    gatewayConfig;//协议定义映射表
+    public ProtocolAction   protocolAction;//协议函数定义 - 控制类
+    private GatewayUtil gatewayUtil;//工具类，拆包/解包
+    
+    public Websocket        websocket;
+    public Tcp              tcp;
 
-    public GatewayConfig gatewayConfig;
-    public ProtocolAction protocolAction;//协议函数定义 - 控制类
     public int contentType;//传输内容体类型
     public int protocolType;//传输协议类型
     public string userToken;//用户登陆成功后的 token
 
-    public Log log;
-    private GatewayUtil gatewayUtil;//工具类，拆包/解包
+    public int                  logLevel;
+    public GatewayHook          gatewayHook;
+    public int                  loginStatus;//登陆状态：长连接建立成功后，需要登陆验证成功后，才可以有后续操作    
+    public int                  connectTimeout;     //创建连接时：超时时间(秒)
+    public bool                 stopHeartbeat;
+    public List<Pb.Heartbeat>   HeartbeatQueue;
 
-    public Websocket websocket;
-    public Tcp tcp;
-    public int logLevel;
-    public GatewayHook gatewayHook;
-    public int loginStatus;//登陆状态：长连接建立成功后，需要登陆验证成功后，才可以有后续操作
-    public BackMsg backMsg;
-    public int connectTimeout;     //创建连接时：超时时间(秒)
-    public bool stopHeartbeat;
-
-    public FDExceptionCallback fdExceptionCallback;
-    public ConnectCallback connectCallback;    //长连接，成功回调
+    public FDExceptionCallback  fdExceptionCallback;
+    public ConnectCallback      connectCallback;    //长连接，成功回调
+    public BackMsg              backMsg;//消息回调
+    
 
     public enum CONN_STATE
     {
@@ -103,7 +99,8 @@ public class Gateway
     //初始化，开始连接后端服务器
     public void Init(int contentType, int protocolType, GatewayConfig gatewayConfig, ProtocolAction protocolAction, string userToken, BackMsg backMsg, ConnectCallback connectCallback, FDExceptionCallback fdExceptionCallback)
     {
-        this.CheckConstructor(contentType, protocolType, gatewayConfig, protocolAction, userToken);
+        //this.gatewayUtil
+        this.gatewayUtil.CheckConstructor(contentType, protocolType, gatewayConfig, protocolAction, userToken);
 
         this.contentType = contentType;
         this.protocolType = protocolType;
@@ -113,6 +110,7 @@ public class Gateway
         this.userToken = userToken;
         this.fdExceptionCallback = fdExceptionCallback;
         this.connectCallback = connectCallback;
+        this.HeartbeatQueue = new List<Pb.Heartbeat>();//保留五次心跳的数据
 
         if (this.protocolType == (int)Gateway.PROTOCOL_TYPE.WS)
         {
@@ -123,28 +121,18 @@ public class Gateway
         }
         else
         {
-            //this.Tcp = new Tcp(gatewayConfig, this.ReceiveMsg, this.ConnSuccessBack, this.logLevel);
-            //this.Tcp.Init();
+            this.tcp = new Tcp(this.gatewayConfig, this.ReceiveMsg, this.ConnectCallback, this.logLevel, (int)Websocket.WS_PROTOCOL.WS, this.connectTimeout, this.FDException);
+            this.tcp.Init();
         }
     }
+    //========================回调函数//========================
+    //fd 连接出现了异常
     public void FDException(string msg )
     {
         this.stopHeartbeat = true;
-        if (this.fdExceptionCallback!=null)
+        if (this.fdExceptionCallback != null)
         {
             this.fdExceptionCallback(msg);
-        }
-    }
-    //获取当前长连接的状态
-    public int GetConnectStatus()
-    {
-        if (this.protocolType == (int)Gateway.PROTOCOL_TYPE.WS)
-        {
-            return this.websocket.state;
-        }
-        else
-        {
-            return this.tcp.state;
         }
     }
     //创建连接：成功/失败，后，回调此函数（即使失败，也会回调，因为其内部有定时器）
@@ -160,16 +148,18 @@ public class Gateway
         }
         else
         {
-            this.throwExpception("connect failed , msgL:"+msg);
+            this.throwExpception("connect failed , msgL:" + msg);
         }
-        
     }
+
     //接收后端发送的消息
     public void ReceiveMsg(byte[] readBuff)
     {
         var msg = this.gatewayUtil.UnpackMsg(readBuff);
         this.ProcessContent(msg);
     }
+    //========================回调函数//========================
+
     //处理消息(拆包后，具体的消息内容)
     public void ProcessContent(GatewayMsg msg)
     {
@@ -182,7 +172,7 @@ public class Gateway
 
         switch (serviceIdFuncId)
         {
-            case "90112":
+            case "90112"://SC_Login  ,登陆结果
                 var loginRes = this.gatewayHook.ParserSC_Login(contentType, msg.Content);
                 if (loginRes.Code != 200)
                 {
@@ -191,13 +181,13 @@ public class Gateway
                 }
                 else
                 {
-                    this.log.Info("login success.");
-                    this.stopHeartbeat = false;
-                    this.Heartbeat();
+                    this.log.Info("login success.");                                  
                     this.loginStatus = (int)Gateway.LOGIN_STATUS.SUCCESS;
+                    //连接成功后，试着PING一下，没问题后，再开启心跳
+                    this.CS_Ping();
                 }
                 break;
-            case "90114"://SC_Ping
+            case "90114"://SC_Ping，服务端PING客户端
                 var pingReq = this.gatewayHook.ParserSC_Ping(contentType, msg.Content);
                 var pongRes = new Pb.PongRes();
                 pongRes.ClientReqTime = pingReq.ClientReqTime;
@@ -209,16 +199,23 @@ public class Gateway
                 this.SendMsgById(90, 108, sendContent);
 
                 break;
-            case "90116"://SC_Pong
+            case "90116"://SC_Pong，服务端响应客户端PING
                 var contentObj = this.gatewayHook.ParserSC_Pong(contentType, msg.Content);
                 this.log.debug("SC_Pong:"+ contentObj.ServerReceiveTime);
-                this.CS_ProjectPushMsg("test unity send msg from c# script");
+                //this.CS_ProjectPushMsg("test unity send msg from c# script");
+                var rtt = contentObj.ServerReceiveTime - contentObj.ClientReqTime;
+                this.log.debug("SC_Pong ClientReqTime:" + contentObj.ClientReqTime + " ,ServerReceiveTime:"+ contentObj.ServerReceiveTime + ",ServerResponseTime:" + contentObj.ServerResponseTime+ ",rtt:"+ rtt);
+                if (this.gatewayConfig.client_heartbeat_time > 0)
+                {
+                    this.Heartbeat();
+                }
+
                 break;
-            case "90120"://SC_KickOff
+            case "90120"://SC_KickOff，被其它连接给踢掉了
                 var kickOff = this.gatewayHook.ParserSC_KickOff(contentType, msg.Content);
                 this.log.Info("ws conn has kickOff");
                 break;
-            case "90124"://SC_ProjectPushMsg
+            case "90124"://SC_ProjectPushMsg，服务端推送消息
                 var projectPushMsg = this.gatewayHook.ParserSC_ProjectPushMsg(contentType, msg.Content);
                 this.log.debug("projectPushMsg content:"+ projectPushMsg.Content);
                 if (this.backMsg != null)
@@ -229,12 +226,15 @@ public class Gateway
             case "90126"://SC_SendMsg
                 var pb_msg = this.gatewayHook.ParserSC_SendMsg(contentType, msg.Content);
                 break;
+            case "90118"://SC_Heartbeat，服务端响应心跳
+                var pbHeartbeat = this.gatewayHook.ParserSC_Heartbeat(contentType, msg.Content);
+                break;
             default:
                 Debug.Log("no hit.");
                 break;
         }
     }
-
+    //关闭连接
     public void Close()
     {
         this.stopHeartbeat = true;
@@ -247,32 +247,21 @@ public class Gateway
             this.tcp.Close();
         }
     }
-
-    public void CS_ProjectPushMsg(string content)
+    //定时心跳
+    public async void Heartbeat()
     {
-        var projectPushMsg = new Pb.ProjectPushMsg();
-        projectPushMsg.SourceProjectId = 6;
-        projectPushMsg.TargetProjectId = 6;
-        projectPushMsg.TargetUids = "1,2";
-        projectPushMsg.Content = content;
-        var str = this.CompressionContent(this.contentType,projectPushMsg);
-        this.SendMsgById(90,122,str);
-    }
+        this.stopHeartbeat = false;
+        while (true)
+        {
+            if (this.GetConnectStatus() != (int)Gateway.CONN_STATE.SUCCESS || this.stopHeartbeat)
+            {
+                this.log.Info("stop Heartbeat");
+                break;
+            }
 
-
-    public void Heartbeat()
-    {
-        //while (true)
-        //{
-        //    if (this.GetConnectStatus() != (int)Gateway.CONN_STATE.SUCCESS || this.stopHeartbeat)
-        //    {
-        //        this.log.Info("start Heartbeat");
-        //        break;
-        //    }
-
-            this.CS_Ping();
-        //    System.Threading.Tasks.Task.Delay(3000);
-        //}
+            this.CS_Heartbeat();
+            await Task.Delay(this.gatewayConfig.client_heartbeat_time * 1000);
+        }
     }
     //发送一条消息给后端(通过ID)
     public void SendMsgById(int serviceId, int funcId, byte[] content)
@@ -296,6 +285,7 @@ public class Gateway
         }
         this.SendMsg(item, content);
     }
+    //发送消息
     public void SendMsg(ActionMapItem item, byte[] content)
     {
         if (content.Length <= 0 )
@@ -319,12 +309,22 @@ public class Gateway
         }
         else
         {
-
-            
+            this.tcp.SendMsg(packContent);            
         }
 
     }
-    //发送登陆消息
+    //推送消息
+    public void CS_ProjectPushMsg(string content)
+    {
+        var projectPushMsg = new Pb.ProjectPushMsg();
+        projectPushMsg.SourceProjectId = 6;
+        projectPushMsg.TargetProjectId = 6;
+        projectPushMsg.TargetUids = "1,2";
+        projectPushMsg.Content = content;
+        var str = this.CompressionContent(this.contentType, projectPushMsg);
+        this.SendMsgById(90, 122, str);
+    }
+    //登陆
     public void CS_Login()
     {
         this.loginStatus = (int)Gateway.LOGIN_STATUS.ING;
@@ -345,6 +345,92 @@ public class Gateway
         var compressionContent = this.CompressionContent(this.contentType, pingReq);
         this.SendMsgById(90, 106, compressionContent);
     }
+    //发送心跳消息
+    public void CS_Heartbeat()
+    {
+        var heartbeat = new Pb.Heartbeat();
+        heartbeat.ClientReceiveTime = Util.GetTimestamp();
+        heartbeat.RequestId = heartbeat.ClientReceiveTime + "";
+        var compressionContent = this.CompressionContent(this.contentType, heartbeat);
+
+        this.SendMsgById(90, 110, compressionContent);
+        this.PushHeartbeat(heartbeat);
+    }
+    //存储每次心跳记录
+    public void PushHeartbeat(Pb.Heartbeat heartbeat )
+    {
+        var len = this.HeartbeatQueue.Count;
+        this.log.debug("PushHeartbeat len:" + len);
+        if (len < 5)
+        {
+            this.HeartbeatQueue.Add(heartbeat);
+            return;
+        }
+
+        for (var i = 0; i < len; i++)
+        {
+            if (this.HeartbeatQueue[i].ServerReceiveTime > 0 || this.HeartbeatQueue[i].ServerResponseTime > 0 )
+            {
+                this.HeartbeatQueue.RemoveAt(i);
+            }
+        }
+
+        len = this.HeartbeatQueue.Count;
+        if (len >=5 )
+        {
+            this.log.Info("HeartbeatQueue.Count > 5 ,del first element");
+            this.HeartbeatQueue.RemoveAt(0);
+        }
+        this.HeartbeatQueue.Add(heartbeat);
+
+    }
+    //接收到服务端的心跳响应后，做更新
+    public void UpHeartbeat(Pb.Heartbeat heartbeat)
+    {
+        for (var i = 0; i < this.HeartbeatQueue.Count; i++)
+        {
+            if (this.HeartbeatQueue[i].RequestId == heartbeat.RequestId)
+            {
+                this.HeartbeatQueue[i].ServerReceiveTime = heartbeat.ServerReceiveTime;
+                this.HeartbeatQueue[i].ServerReceiveTime = heartbeat.ServerResponseTime;
+            }
+        }
+        this.log.debug("UpHeartbeat not found.");
+    }
+    //获取最近一次 RTT 值
+    public Int64 GetRTT()
+    {
+        if (this.HeartbeatQueue.Count <=0)
+        {
+            this.log.debug("GetRTT this.HeartbeatQueue.Count <=0");
+            return 0;
+        }
+
+        for (var i = this.HeartbeatQueue.Count - 1; i >=0; i--)
+        {
+            if (this.HeartbeatQueue[i].ServerReceiveTime > 0 || this.HeartbeatQueue[i].ServerResponseTime > 0)
+            {
+                var rtt = this.HeartbeatQueue[i].ServerResponseTime - this.HeartbeatQueue[i].ClientReqTime;
+                return rtt;
+            }
+        }
+        this.log.debug("HeartbeatQueue all element no  ServerResponseTime.");
+        return 0;
+
+    }
+    //获取当前长连接的状态
+    public int GetConnectStatus()
+    {
+        if (this.protocolType == (int)Gateway.PROTOCOL_TYPE.WS)
+        {
+            return this.websocket.state;
+        }
+        else
+        {
+            return this.tcp.state;
+        }
+    }
+
 
     //=============================偏简单功能性的函数=============================
 
@@ -381,67 +467,7 @@ public class Gateway
         {
             return c.ToByteArray();
         }
-    }
-
-    private bool CheckContentType(int flag)
-    {
-        var list = Enum.GetValues(typeof(Gateway.CONTENT_TYPE));
-        foreach (var value in list)
-        {
-            if (flag == (int)value)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private bool CheckProtoclType(int flag)
-    {
-        var list = Enum.GetValues(typeof(Gateway.PROTOCOL_TYPE));
-        foreach (var value in list)
-        {
-            if (flag == (int)value)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void CheckConstructor(int contentType, int protocolType, GatewayConfig gatewayConfig, ProtocolAction protocolAction, string userToken)
-    {
-        this.log.Info("construction , contentType:" + contentType + " , protocolType:" + protocolType + " , userToken:" + userToken);
-        if (!this.CheckProtoclType(protocolType))
-        {
-            this.throwExpception("protocolType value err . ");
-        }
-
-        if (!this.CheckContentType(contentType))
-        {
-            this.throwExpception("contentType value err . ");
-        }
-
-        if (userToken == "")
-        {
-            this.throwExpception("userToken empty . ");
-        }
-
-        if (protocolAction == null || protocolAction.map.client == null || protocolAction.map.server == null)
-        {
-            this.throwExpception("actionMap null . ");
-        }
-
-        if (protocolAction.map.client.Count == 0 || protocolAction.map.server.Count == 0)
-        {
-            this.throwExpception("actionMap count == 0");
-        }
-
-        if (gatewayConfig.outIp == "" || gatewayConfig.wsPort == "" || gatewayConfig.wsUri == "")
-        {
-            this.throwExpception("check gatewayConfig , outIp || wsPort || wsUri is empty~");
-        }
-    }
+    }    
 
     public void throwExpception(string errInfo)
     {
@@ -550,4 +576,65 @@ class GatewayUtil
         this.log.Err(errInfo);
         throw new Exception(errInfo);
     }
+
+    public bool CheckContentType(int flag)
+    {
+        var list = Enum.GetValues(typeof(Gateway.CONTENT_TYPE));
+        foreach (var value in list)
+        {
+            if (flag == (int)value)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public bool CheckProtoclType(int flag)
+    {
+        var list = Enum.GetValues(typeof(Gateway.PROTOCOL_TYPE));
+        foreach (var value in list)
+        {
+            if (flag == (int)value)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void CheckConstructor(int contentType, int protocolType, GatewayConfig gatewayConfig, ProtocolAction protocolAction, string userToken)
+    {
+        this.log.Info("construction , contentType:" + contentType + " , protocolType:" + protocolType + " , userToken:" + userToken);
+        if (!this.CheckProtoclType(protocolType))
+        {
+            this.throwExpception("protocolType value err . ");
+        }
+
+        if (!this.CheckContentType(contentType))
+        {
+            this.throwExpception("contentType value err . ");
+        }
+
+        if (userToken == "")
+        {
+            this.throwExpception("userToken empty . ");
+        }
+
+        if (protocolAction == null || protocolAction.map.client == null || protocolAction.map.server == null)
+        {
+            this.throwExpception("actionMap null . ");
+        }
+
+        if (protocolAction.map.client.Count == 0 || protocolAction.map.server.Count == 0)
+        {
+            this.throwExpception("actionMap count == 0");
+        }
+
+        if (gatewayConfig.outIp == "" || gatewayConfig.wsPort == "" || gatewayConfig.wsUri == "")
+        {
+            this.throwExpception("check gatewayConfig , outIp || wsPort || wsUri is empty~");
+        }
+    }
+
 }

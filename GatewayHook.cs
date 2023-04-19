@@ -9,49 +9,6 @@ using UnityEngine;
 public class GatewayHook
 {
 
-    //public object ParserContent(int contentType, string content, int serviceId, int funcId)
-    //{
-    //    string serviceIdFuncId = Convert.ToString(serviceId) + Convert.ToString(funcId);
-    //    if (contentType == 1)
-    //    {
-    //        return this.ParserContentJson(content, serviceIdFuncId);
-    //    }
-    //    else
-    //    {
-    //        return this.ParserContentProtobuf(content, serviceIdFuncId);
-    //    }
-
-
-    //}
-
-    //public object ParserContentJson(string content,string serviceIdFuncId)
-    //{
-    //    object ob = null;
-    //    switch (serviceIdFuncId)
-    //    {
-    //        case "90112":
-    //            Pb.LoginRes loginRes = JsonParser.Default.Parse<Pb.LoginRes>(content);
-    //            ob = loginRes;
-    //            break;
-    //    }
-    //    return ob;
-    //}
-
-    //public object ParserContentProtobuf(string content,string serviceIdFuncId)
-    //{
-    //    object ob = null;
-    //    switch (serviceIdFuncId)
-    //    {
-    //        case "90112":
-    //            //Pb.LoginRes loginRes = new Pb.LoginRes();、
-    //            var b =  System.Text.Encoding.UTF8.GetBytes(content);
-    //            Pb.LoginRes lr = Pb.LoginRes.Parser.ParseFrom(b);
-    //            ob = lr;
-    //            break;
-    //    }
-    //    return ob;
-    //}
-
     public Pb.LoginRes ParserSC_Login(int contentType, byte[] content)
     {
         //Pb.LoginRes loginRes = JsonMapper.ToObject<Pb.LoginRes>(@content);
@@ -61,8 +18,7 @@ public class GatewayHook
         if (contentType == (int)Gateway.CONTENT_TYPE.JSON)
         {
             string contentStr = System.Text.Encoding.Default.GetString(content);
-            Pb.LoginRes loginRes = JsonParser.Default.Parse<Pb.LoginRes>(contentStr);
-            ob = loginRes;
+            ob = JsonParser.Default.Parse<Pb.LoginRes>(contentStr);
         }
         else
         {
@@ -96,8 +52,7 @@ public class GatewayHook
         if (contentType == (int)Gateway.CONTENT_TYPE.JSON)
         {
             string contentStr = System.Text.Encoding.Default.GetString(content);
-            var  obj = JsonParser.Default.Parse<Pb.PongRes>(contentStr);
-            ob = obj;
+            ob = JsonParser.Default.Parse<Pb.PongRes>(contentStr);
         }
         else
         {
@@ -112,8 +67,7 @@ public class GatewayHook
         if (contentType == (int)Gateway.CONTENT_TYPE.JSON)
         {
             string contentStr = System.Text.Encoding.Default.GetString(content);
-            var obj = JsonParser.Default.Parse<Pb.KickOff>(contentStr);
-            ob = obj;
+            ob = JsonParser.Default.Parse<Pb.KickOff>(contentStr);
         }
         else
         {
@@ -128,8 +82,7 @@ public class GatewayHook
         if (contentType == (int)Gateway.CONTENT_TYPE.JSON)
         {
             string contentStr = System.Text.Encoding.Default.GetString(content);
-            var obj = JsonParser.Default.Parse<Pb.ProjectPushMsg>(contentStr);
-            ob = obj;
+            ob = JsonParser.Default.Parse<Pb.ProjectPushMsg>(contentStr);
         }
         else
         {
@@ -144,12 +97,26 @@ public class GatewayHook
         if (contentType == (int)Gateway.CONTENT_TYPE.JSON)
         {
             string contentStr = System.Text.Encoding.Default.GetString(content);
-            var obj = JsonParser.Default.Parse<Pb.Msg>(contentStr);
-            ob = obj;
+            ob = JsonParser.Default.Parse<Pb.Msg>(contentStr);
         }
         else
         {
             ob = Pb.Msg.Parser.ParseFrom(content);
+        }
+        return ob;
+    }
+
+    public Pb.Heartbeat ParserSC_Heartbeat(int contentType, byte[] content)
+    {
+        Pb.Heartbeat ob = null;
+        if (contentType == (int)Gateway.CONTENT_TYPE.JSON)
+        {
+            string contentStr = System.Text.Encoding.Default.GetString(content);
+            ob = JsonParser.Default.Parse<Pb.Heartbeat>(contentStr);
+        }
+        else
+        {
+            ob = Pb.Heartbeat.Parser.ParseFrom(content);
         }
         return ob;
     }
@@ -167,6 +134,47 @@ public class GatewayHook
     //    else
     //    {
     //        ob = Pb.XXXX.Parser.ParseFrom(content);
+    //    }
+    //    return ob;
+    //}
+
+    //public object ParserContent(int contentType, string content, int serviceId, int funcId)
+    //{
+    //    string serviceIdFuncId = Convert.ToString(serviceId) + Convert.ToString(funcId);
+    //    if (contentType == 1)
+    //    {
+    //        return this.ParserContentJson(content, serviceIdFuncId);
+    //    }
+    //    else
+    //    {
+    //        return this.ParserContentProtobuf(content, serviceIdFuncId);
+    //    }
+    //}
+
+    //public object ParserContentJson(string content,string serviceIdFuncId)
+    //{
+    //    object ob = null;
+    //    switch (serviceIdFuncId)
+    //    {
+    //        case "90112":
+    //            Pb.LoginRes loginRes = JsonParser.Default.Parse<Pb.LoginRes>(content);
+    //            ob = loginRes;
+    //            break;
+    //    }
+    //    return ob;
+    //}
+
+    //public object ParserContentProtobuf(string content,string serviceIdFuncId)
+    //{
+    //    object ob = null;
+    //    switch (serviceIdFuncId)
+    //    {
+    //        case "90112":
+    //            //Pb.LoginRes loginRes = new Pb.LoginRes();、
+    //            var b =  System.Text.Encoding.UTF8.GetBytes(content);
+    //            Pb.LoginRes lr = Pb.LoginRes.Parser.ParseFrom(b);
+    //            ob = lr;
+    //            break;
     //    }
     //    return ob;
     //}
