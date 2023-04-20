@@ -26,7 +26,7 @@ public class Test
         //this.TestUseHttp();
         //return;
         //正常登陆
-        this.controller.UseHttp("http://8.142.177.235:2222/", "11", "6", "imzgoframe", "frame_sync_1", "123456");
+        this.controller.UseHttp("http://xxxx", "11", "6", "", "", "");
     }
 
     public void UseGateway()
@@ -50,10 +50,7 @@ public class Test
 
     public void TestUseHttp()
     {
-        //测试参数为空
-        //this.controller.UseHttp("", "11", "6", "imzgoframe", "", "123456");
-        //测试登陆失败
-        //this.controller.UseHttp("http://8.142.177.235:2222/", "11", "6", "imzgoframe", "1111", "44444");
+
     }
 
 
