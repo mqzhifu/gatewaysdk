@@ -22,11 +22,12 @@ public class Test
 
     }
     public void UseHttp()
-    {
         this.controller.UseHttp("http://127.0.0.1:1111/", "11", "6", "imzgoframe", "frame_sync_1", "123456");
         //this.controller.UseHttp("http://192.168.103.124:1111/", "11", "6", "imzgoframe", "frame_sync_1", "123456");
         //this.controller.UseHttp("http://8.142.177.235:3333/", "11", "6", "imzgoframe", "frame_sync_1", "123456");
-        //this.controller.UseHttp("http://120-test.seedreality.com/", "11", "6", "imzgoframe", "frame_sync_3", "123456");
+        //this.TestUseHttp();
+        //return;
+        //正常登陆
     }
 
     public void UseGateway()
@@ -45,7 +46,6 @@ public class Test
         //this.controller.UseGateway(3, (int)Gateway.PROTOCOL_TYPE.TCP, null);
         //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.JSON, 4, null);
     }
-
     public int TestLoginFailed()
     {
         return -1;
