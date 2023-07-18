@@ -13,7 +13,7 @@ using System.Net.WebSockets;
 using Debug = UnityEngine.Debug;
 using System;
 
-public delegate void HttpCallback();
+
 
 public class Core : MonoBehaviour
 {       
@@ -21,7 +21,9 @@ public class Core : MonoBehaviour
     {
         
         var logLevel = 15;
-        var test = new Test(logLevel);
+        //var test = new Test(logLevel);
+        new TestTask();
+        //new TestDelegation();
 
     }
     

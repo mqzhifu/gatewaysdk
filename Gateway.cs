@@ -169,7 +169,7 @@ public class Gateway
         {
 
         }
-
+        Debug.Log("ReceiveMsg ProcessContent serviceIdFuncId:"+ serviceIdFuncId);
         switch (serviceIdFuncId)
         {
             case "90112"://SC_Login  ,登陆结果
@@ -253,6 +253,7 @@ public class Gateway
         this.stopHeartbeat = false;
         while (true)
         {
+            this.log.debug("Heartbeat once:");
             if (this.GetConnectStatus() != (int)Gateway.CONN_STATE.SUCCESS || this.stopHeartbeat)
             {
                 this.log.Info("stop Heartbeat");
@@ -348,13 +349,14 @@ public class Gateway
     //发送心跳消息
     public void CS_Heartbeat()
     {
+        this.log.debug("CS_Heartbeat once");
         var heartbeat = new Pb.Heartbeat();
         heartbeat.ClientReceiveTime = Util.GetTimestamp();
         heartbeat.RequestId = heartbeat.ClientReceiveTime + "";
         var compressionContent = this.CompressionContent(this.contentType, heartbeat);
 
         this.SendMsgById(90, 110, compressionContent);
-        this.PushHeartbeat(heartbeat);
+        //this.PushHeartbeat(heartbeat);
     }
     //存储每次心跳记录
     public void PushHeartbeat(Pb.Heartbeat heartbeat )
@@ -440,13 +442,14 @@ public class Gateway
         //Debug.Log("CompressionContent contentType:" + contentType);
         if (this.contentType == (int)Gateway.CONTENT_TYPE.JSON)
         {
+            //这里JS对long int 给转换成了字符串，得给转会long int
             //var jsonS = JsonFormatter.Default.Format(c);
             //this.log.debug("========"+ jsonS);
             var str = c.ToString();
-            Debug.Log(str);
+            //Debug.Log(str);
             Regex r = new Regex(@"""\d{13}""");
             Match m = r.Match(str);
-            Debug.Log("m.Success:" + m.Success);
+            //Debug.Log("m.Success:" + m.Success);
             if (m.Success)
             {
                 this.log.debug("match index:"+m.Index );
@@ -455,7 +458,7 @@ public class Gateway
                 var endStr = str.Substring(m.Index + 13 + 2);
 
                 var newStr = startStr + middleStr + endStr;
-                this.log.debug("newStr:" + newStr);
+                //this.log.debug("newStr:" + newStr);
                 str = newStr;
 
 

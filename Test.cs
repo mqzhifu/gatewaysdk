@@ -9,7 +9,7 @@ public class Test
     public Controller controller;
     public Test(int logLevel)
     {
-        this.log = new Log(logLevel, "core");
+        this.log = new Log(logLevel, "Test");
         this.log.Info("start:");
         this.controller = new Controller(logLevel);
         this.UseHttp();
@@ -23,22 +23,20 @@ public class Test
     }
     public void UseHttp()
     {
-        //this.TestUseHttp();
-        //return;
-        //正常登陆
-        this.controller.UseHttp("http://8.142.177.235:2222/", "11", "6", "imzgoframe", "frame_sync_1", "123456");
+        this.controller.UseHttp("http://127.0.0.1:1111/", "11", "6", "imzgoframe", "frame_sync_1", "123456");
+        //this.controller.UseHttp("http://192.168.103.124:1111/", "11", "6", "imzgoframe", "frame_sync_1", "123456");
+        //this.controller.UseHttp("http://8.142.177.235:3333/", "11", "6", "imzgoframe", "frame_sync_1", "123456");
+        //this.controller.UseHttp("http://120-test.seedreality.com/", "11", "6", "imzgoframe", "frame_sync_3", "123456");
     }
 
     public void UseGateway()
     {
-        //this.TestUseGateway();
-        //return;
 
-        //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.PROTOBUF, (int)Gateway.PROTOCOL_TYPE.TCP, null);
-        //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.PROTOBUF, (int)Gateway.PROTOCOL_TYPE.WS, null);
+        //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.PROTOBUF, (int)Gateway.PROTOCOL_TYPE.TCP, null);//ROTOBUF+TCP
+        //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.PROTOBUF, (int)Gateway.PROTOCOL_TYPE.WS, null);//ROTOBUF+WS
 
-        //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.JSON, (int)Gateway.PROTOCOL_TYPE.TCP, null);
-        this.controller.UseGateway((int)Gateway.CONTENT_TYPE.JSON, (int)Gateway.PROTOCOL_TYPE.WS, this.receiveMsg,null,null);
+        //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.JSON, (int)Gateway.PROTOCOL_TYPE.TCP, null);//JSON+TCP
+        this.controller.UseGateway((int)Gateway.CONTENT_TYPE.JSON, (int)Gateway.PROTOCOL_TYPE.WS, this.receiveMsg,null,null);//JSON+WS
     }
 
     public void TestUseGateway()
@@ -47,15 +45,6 @@ public class Test
         //this.controller.UseGateway(3, (int)Gateway.PROTOCOL_TYPE.TCP, null);
         //this.controller.UseGateway((int)Gateway.CONTENT_TYPE.JSON, 4, null);
     }
-
-    public void TestUseHttp()
-    {
-        //测试参数为空
-        //this.controller.UseHttp("", "11", "6", "imzgoframe", "", "123456");
-        //测试登陆失败
-        //this.controller.UseHttp("http://8.142.177.235:2222/", "11", "6", "imzgoframe", "1111", "44444");
-    }
-
 
     public int TestLoginFailed()
     {

@@ -10,7 +10,7 @@ public class Controller
     public Log log;
     public HttpUtil httpUtil;
     public Gateway gateway;
-    public ApiLogicAwait apiLogicAwait;
+    public ApiLogic apiLogic;
     public ProtocolAction protocolAction;
     public int logLevel;
     public Controller(int logLevel)
@@ -22,30 +22,10 @@ public class Controller
     public void UseHttp(string dns, string sourceType, string projectId, string access, string username, string password)
     {
         this.httpUtil = new HttpUtil(dns, sourceType, projectId, access,this.logLevel);
-        this.apiLogicAwait = new ApiLogicAwait(this.httpUtil,this.logLevel);
-        this.apiLogicAwait.LoginBlock(username, password);
+        this.apiLogic = new ApiLogic(this.httpUtil,this.logLevel);
+        this.apiLogic.LoginBlock(username, password);
     }
 
-    public void HttpAsyncLogin()
-    {
-        //int retryTime = 0;//超时时间
-        //while (this.apiLogicAwait.initStatus == (int)ApiLogicAwait.API_LOGIC_INIT_STATUS.PROCESSING)
-        //{
-        //    if (retryTime > this.apiLogicAwait.initTimeout * 1000)
-        //    {
-        //        this.log.Err("retryTime timeout. initTimeout:" + this.apiLogicAwait.initTimeout);
-        //        break;
-        //    }
-        //    Task.Delay(100);
-        //    retryTime += 100;
-        //}
-
-        //if (this.apiLogicAwait.initStatus != (int)ApiLogicAwait.API_LOGIC_INIT_STATUS.SUCCESS)
-        //{
-        //    this.log.Err("apiLogicAwait.InitStatus ");
-        //    return;
-        //}
-    }
     //使用网关组件，它强依赖 apiLogicAwait ，且 apiLogicAwait 要登陆成功
     public void UseGateway(int contentType, int protocolType, BackMsg backMsg, ConnectCallback connectCallback, FDExceptionCallback fdExceptionCallback)
     {
@@ -58,19 +38,19 @@ public class Controller
         //{
         //    this.throwExpception("ApiLogicAwait.API_LOGIC_INIT_STATUS != SUCCESS");
         //}
-        if (this.apiLogicAwait.userToken == "" || this.apiLogicAwait.userId == 0)
+        if (this.apiLogic.userToken == "" || this.apiLogic.userId == 0)
         {
             this.throwException("userToken or userId empty");
         }
 
         this.protocolAction = new ProtocolAction(this.logLevel);//创建长连接自定义协议管理类
-        this.apiLogicAwait.SetProtocolAction(this.protocolAction);
+        this.apiLogic.SetProtocolAction(this.protocolAction);
         //请求 HTTP 获取后端的配置数据，这里最好捕获一下异常。
-        this.apiLogicAwait.InitGateway();
+        this.apiLogic.InitGateway();
 
         this.gateway = new Gateway(this.logLevel);
         //这里最好捕获一下异常，比如：创建连接失败
-        this.gateway.Init(contentType, protocolType, this.apiLogicAwait.gatewayConfig, this.protocolAction, this.apiLogicAwait.userToken, backMsg,connectCallback,fdExceptionCallback);
+        this.gateway.Init(contentType, protocolType, this.apiLogic.gatewayConfig, this.protocolAction, this.apiLogic.userToken, backMsg,connectCallback,fdExceptionCallback);
     }
     //
     public void throwException(string errInfo)

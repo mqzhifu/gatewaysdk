@@ -86,7 +86,10 @@ public class Websocket
         {
             this.throwExpception("check gatewayConfig , outIp || wsPort || wsUri is empty~ ");
         }
-        string url  =   gatewayConfig.outIp + ":" + gatewayConfig.wsPort + gatewayConfig.wsUri;
+        //使用IP连接
+        string url  = gatewayConfig.outIp + ":" + gatewayConfig.wsPort + gatewayConfig.wsUri;
+        //使用域名连接
+        //string url = gatewayConfig.outDomain + ":" + gatewayConfig.wsPort + gatewayConfig.wsUri;
         if (this.wsProtocol  == (int)Websocket.WS_PROTOCOL.WS)
         {
             url  = "ws://" + url;
@@ -107,6 +110,7 @@ public class Websocket
 
         while (true)
         {
+            this.log.Info("ReceiveMsg one :");
             if (this.clientWebSocket.State != WebSocketState.Open || this.clientWebSocket.State == WebSocketState.Closed)
             {
                 this.fdExceptionCallback("clientWebSocket.State != Open || WebSocketState.Closed");
@@ -157,6 +161,7 @@ public class Websocket
                 }                  
             }            
         }
+        this.log.debug("ReceiveMsg loop dead.");
     }
     public async void SendMsg(byte[] content)
     {
